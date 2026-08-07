@@ -36,7 +36,7 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ onGoPublicSite }: AdminLayoutProps) {
-  const { logoutAdmin, orders, adminEmail } = useApp();
+  const { logoutAdmin, orders, adminEmail, isDbConnected } = useApp();
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -259,6 +259,17 @@ export default function AdminLayout({ onGoPublicSite }: AdminLayoutProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* FIREBASE STATUS BADGE */}
+            <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border ${
+              isDbConnected 
+                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/80' 
+                : 'bg-amber-950/80 text-amber-400 border-amber-800/80'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className="hidden sm:inline">{isDbConnected ? 'قاعدة البيانات (Firebase Live)' : 'جاري الاتصال...'}</span>
+              <span className="sm:hidden">{isDbConnected ? 'Firebase' : 'أوفلاين'}</span>
+            </div>
+
             {pendingOrdersCount > 0 && (
               <button
                 onClick={() => setActiveTab('orders')}
