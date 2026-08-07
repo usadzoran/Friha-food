@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Settings, Save, Power, Phone, MessageSquare, Globe, Check, AlertCircle } from 'lucide-react';
+import { Settings, Save, Power, Globe, Check, Trash2 } from 'lucide-react';
 
 export default function SettingsTab() {
-  const { settings, updateSettings, seedInitialData, isDbConnected } = useApp();
+  const { settings, updateSettings, clearAllData, isDbConnected } = useApp();
   const [formData, setFormData] = useState({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,11 +15,11 @@ export default function SettingsTab() {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleSeedDatabase = async () => {
-    if (confirm('هل ترغب في شحن قاعدة البيانات بالسجلات والبيانات الأولية؟')) {
-      setIsSeeding(true);
-      await seedInitialData();
-      setIsSeeding(false);
+  const handleClearDatabase = async () => {
+    if (confirm('هل أنت متاكد من مسح جميع السجلات المطاعم، المنتجات، الفئات والعروض من قاعدة البيانات للبدء بقائمة فارغة تماماً؟')) {
+      setIsClearing(true);
+      await clearAllData();
+      setIsClearing(false);
     }
   };
 
@@ -194,17 +194,18 @@ export default function SettingsTab() {
                 <span>إدارة قاعدة البيانات المباشرة (Firebase Firestore)</span>
               </h3>
               <p className="text-xs text-stone-400">
-                حالة الاتصال: {isDbConnected ? 'متصل بنجاح 🟢' : 'جاري الاتصال 🟡'} — جميع البيانات تُقرأ وتُكتب مباشرة في قاعدة البيانات.
+                حالة الاتصال: {isDbConnected ? 'متصل بنجاح 🟢' : 'جاري الاتصال 🟡'} — جميع التغييرات تُقرأ وتُكتب مباشرة في قاعدة البيانات الحقيقية.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={handleSeedDatabase}
-              disabled={isSeeding}
-              className="px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 transition-all cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
+              onClick={handleClearDatabase}
+              disabled={isClearing}
+              className="px-5 py-2.5 rounded-xl font-bold text-xs bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/80 transition-all cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
             >
-              <span>{isSeeding ? 'جاري شحن قاعدة البيانات...' : 'شحن البيانات الأولية لقاعدة البيانات'}</span>
+              <Trash2 className="w-4 h-4" />
+              <span>{isClearing ? 'جاري تفريغ قاعدة البيانات...' : 'مسح وتفريغ كل البيانات القديمة'}</span>
             </button>
           </div>
         </div>

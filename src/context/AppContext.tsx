@@ -6,7 +6,7 @@ import {
   updateDocument,
   deleteDocument,
   setDocumentMerge,
-  seedInitialDatabaseIfEmpty
+  clearAllDatabaseCollections
 } from '../services/dbService';
 import {
   Restaurant,
@@ -35,7 +35,7 @@ interface AppContextType {
   toast: ToastNotice | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   clearToast: () => void;
-  seedInitialData: () => Promise<void>;
+  clearAllData: () => Promise<void>;
 
   // Admin Auth
   isAdminLoggedIn: boolean;
@@ -148,7 +148,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data) {
           setSettings(data);
         } else {
-          // initialize default settings in Firestore
           setDocumentMerge('settings', 'site_config', INITIAL_SETTINGS).catch(console.error);
         }
       },
@@ -238,17 +237,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('تم تسجيل الخروج', 'info');
   };
 
-  const seedInitialData = async () => {
+  const clearAllData = async () => {
     try {
-      const result = await seedInitialDatabaseIfEmpty();
-      if (result) {
-        showToast('تم شحن قاعدة البيانات بالبيانات الأولية بنجاح!', 'success');
-      } else {
-        showToast('قاعدة البيانات تحتوي بالفعل على بيانات.', 'info');
-      }
+      await clearAllDatabaseCollections();
+      showToast('تم مسح جميع البيانات بنجاح من قاعدة البيانات!', 'success');
     } catch (e) {
       console.error(e);
-      showToast('حدث خطأ أثناء شحن قاعدة البيانات', 'error');
+      showToast('حدث خطأ أثناء مسح البيانات', 'error');
     }
   };
 
@@ -552,7 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast,
         showToast,
         clearToast,
-        seedInitialData,
+        clearAllData,
         isAdminLoggedIn,
         adminEmail,
         loginAdmin,

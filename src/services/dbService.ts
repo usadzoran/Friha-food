@@ -11,24 +11,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
-  Restaurant,
-  Store,
-  Category,
-  Product,
-  Order,
-  UserAccount,
-  Offer,
-  MediaItem,
-  SiteSettings
-} from '../types/admin';
-import {
-  INITIAL_RESTAURANTS,
-  INITIAL_STORES,
-  INITIAL_CATEGORIES,
-  INITIAL_PRODUCTS,
-  INITIAL_ORDERS,
-  INITIAL_USERS,
-  INITIAL_OFFERS,
   INITIAL_SETTINGS
 } from '../lib/store';
 
@@ -112,58 +94,25 @@ export async function setDocumentMerge<T extends Record<string, any>>(
   await setDoc(docRef, data, { merge: true });
 }
 
-// Optional Seed Database Helper if admin requests populating default content
-export async function seedInitialDatabaseIfEmpty(): Promise<boolean> {
-  try {
-    const settingsSnap = await getDocs(collection(db, 'settings'));
-    if (!settingsSnap.empty) {
-      return false; // Already seeded or has data
-    }
+// Clear all database collections completely
+export async function clearAllDatabaseCollections(): Promise<void> {
+  const collectionsToClear = [
+    'restaurants',
+    'stores',
+    'categories',
+    'products',
+    'orders',
+    'users',
+    'offers',
+    'media'
+  ];
 
-    const batch = writeBatch(db);
-
-    // Settings
-    batch.set(doc(db, 'settings', 'site_config'), INITIAL_SETTINGS);
-
-    // Restaurants
-    INITIAL_RESTAURANTS.forEach((r) => {
-      batch.set(doc(db, 'restaurants', r.id), r);
-    });
-
-    // Stores
-    INITIAL_STORES.forEach((s) => {
-      batch.set(doc(db, 'stores', s.id), s);
-    });
-
-    // Categories
-    INITIAL_CATEGORIES.forEach((c) => {
-      batch.set(doc(db, 'categories', c.id), c);
-    });
-
-    // Products
-    INITIAL_PRODUCTS.forEach((p) => {
-      batch.set(doc(db, 'products', p.id), p);
-    });
-
-    // Orders
-    INITIAL_ORDERS.forEach((o) => {
-      batch.set(doc(db, 'orders', o.id), o);
-    });
-
-    // Users
-    INITIAL_USERS.forEach((u) => {
-      batch.set(doc(db, 'users', u.id), u);
-    });
-
-    // Offers
-    INITIAL_OFFERS.forEach((off) => {
-      batch.set(doc(db, 'offers', off.id), off);
-    });
-
-    await batch.commit();
-    return true;
-  } catch (e) {
-    console.error('Error seeding initial database:', e);
-    throw e;
+  for (const colName of collectionsToClear) {
+    const snap = await getDocs(collection(db, colName));
+    const deletePromises = snap.docs.map((docSnap) => deleteDoc(docSnap.ref));
+    await Promise.all(deletePromises);
   }
+
+  // Set default clean settings
+  await setDocumentMerge('settings', 'site_config', INITIAL_SETTINGS);
 }
