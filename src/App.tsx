@@ -10,37 +10,54 @@ import AdminLogin from './components/admin/AdminLogin';
 function MainSiteContent() {
   const { settings, isAdminLoggedIn } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<'food' | 'drinks' | null>(null);
-  const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const checkIsAdminRoute = () => {
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return (
+      path === '/admin' ||
+      path.startsWith('/admin/') ||
+      hash === '#admin' ||
+      hash.startsWith('#/admin') ||
+      search.includes('admin=true') ||
+      search.includes('page=admin')
+    );
+  };
+
+  const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdminRoute);
 
   useEffect(() => {
-    const handlePopState = () => setRoutePath(window.location.pathname);
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const handleLocationChange = () => {
+      setIsAdminRoute(checkIsAdminRoute());
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
-  // ROUTING LOGIC FOR /admin
-  const isAdminRoute = routePath.startsWith('/admin') || routePath === '/admin';
+  const navigateToHome = () => {
+    window.history.pushState({}, '', '/');
+    setIsAdminRoute(false);
+  };
 
   if (isAdminRoute) {
     if (!isAdminLoggedIn) {
       return (
         <AdminLogin
           onSuccess={() => {
-            // Keep on admin route
+            setIsAdminRoute(true);
           }}
-          onGoHome={() => {
-            window.history.pushState({}, '', '/');
-            setRoutePath('/');
-          }}
+          onGoHome={navigateToHome}
         />
       );
     }
     return (
       <AdminLayout
-        onGoPublicSite={() => {
-          window.history.pushState({}, '', '/');
-          setRoutePath('/');
-        }}
+        onGoPublicSite={navigateToHome}
       />
     );
   }
