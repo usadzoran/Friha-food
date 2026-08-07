@@ -1,6 +1,6 @@
 {
-  "name": "اشري من دارك",
-  "description": "منصة طلب المواد الغذائية والمأكولات - اشري من دارك",
+  "name": "انستغرامي",
+  "description": "تطبيق تواصل اجتماعي عصري لمشاركة الصور والفيديوهات والتفاعل في الوقت الحقيقي عبر Firebase",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+  }
+}
