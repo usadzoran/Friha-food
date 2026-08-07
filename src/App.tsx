@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import heroImage from './assets/images/grocery_food_hero_1786092590426.jpg';
+import { Utensils, CupSoda } from 'lucide-react';
 
 export default function App() {
+  const [selectedCategory, setSelectedCategory] = useState<'food' | 'drinks' | null>(null);
+
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-stone-900 flex flex-col items-center justify-center p-4 sm:p-8 lg:p-12 dir-rtl antialiased selection:bg-emerald-600 selection:text-white">
       <main className="max-w-6xl w-full mx-auto flex flex-col items-center text-center space-y-8 sm:space-y-12">
@@ -25,6 +28,35 @@ export default function App() {
               className="w-full h-auto max-h-[70vh] object-cover rounded-xl sm:rounded-[1.5rem] transform transition-transform duration-700 group-hover:scale-[1.01]"
             />
           </div>
+        </div>
+
+        {/* CATEGORY BUTTONS SECTION */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 w-full max-w-2xl pt-2">
+          {/* BUTTON 1: مأكولات */}
+          <button
+            onClick={() => setSelectedCategory('food')}
+            className={`w-full sm:w-1/2 py-4 px-6 rounded-2xl font-cairo font-bold text-lg sm:text-xl flex items-center justify-center gap-3 transition-all duration-300 cursor-pointer shadow-md border ${
+              selectedCategory === 'food'
+                ? 'bg-emerald-700 text-white border-emerald-800 shadow-emerald-900/20 scale-[1.02]'
+                : 'bg-white text-emerald-950 border-stone-200/90 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-lg'
+            }`}
+          >
+            <Utensils className={`w-6 h-6 transition-transform duration-300 ${selectedCategory === 'food' ? 'scale-110' : 'text-emerald-600'}`} />
+            <span>مأكولات</span>
+          </button>
+
+          {/* BUTTON 2: مشروبات */}
+          <button
+            onClick={() => setSelectedCategory('drinks')}
+            className={`w-full sm:w-1/2 py-4 px-6 rounded-2xl font-cairo font-bold text-lg sm:text-xl flex items-center justify-center gap-3 transition-all duration-300 cursor-pointer shadow-md border ${
+              selectedCategory === 'drinks'
+                ? 'bg-emerald-700 text-white border-emerald-800 shadow-emerald-900/20 scale-[1.02]'
+                : 'bg-white text-emerald-950 border-stone-200/90 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-lg'
+            }`}
+          >
+            <CupSoda className={`w-6 h-6 transition-transform duration-300 ${selectedCategory === 'drinks' ? 'scale-110' : 'text-emerald-600'}`} />
+            <span>مشروبات</span>
+          </button>
         </div>
       </main>
     </div>
