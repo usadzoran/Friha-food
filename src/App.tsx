@@ -3,6 +3,7 @@ import heroImage from './assets/images/grocery_food_hero_1786092590426.jpg';
 import { Utensils, CupSoda, AlertTriangle } from 'lucide-react';
 import Footer from './components/Footer';
 import CategoryList from './components/CategoryList';
+import VendorsSection from './components/VendorsSection';
 import { AppProvider, useApp } from './context/AppContext';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminLogin from './components/admin/AdminLogin';
@@ -167,6 +168,11 @@ function MainSiteContent() {
                   <span className="text-sm font-black transition-transform duration-300 group-hover:-translate-x-0.5">←</span>
                 </div>
               </button>
+            </div>
+
+            {/* LIVE VENDORS & RESTAURANTS SECTION */}
+            <div className="w-full pt-4">
+              <VendorsSection />
             </div>
           </>
         ) : (
