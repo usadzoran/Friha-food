@@ -20,36 +20,36 @@ export default function Footer() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Facebook"
-            className="w-9 h-9 rounded-full bg-stone-100 hover:bg-emerald-100 text-stone-600 hover:text-emerald-700 flex items-center justify-center transition-colors duration-200 shadow-xs"
+            className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-blue-600 text-stone-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-xs hover:shadow-lg hover:shadow-blue-600/20 hover:-translate-y-0.5"
           >
-            <Facebook className="w-4 h-4" />
+            <Facebook className="w-5 h-5" />
           </a>
           <a
             href="https://instagram.com"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Instagram"
-            className="w-9 h-9 rounded-full bg-stone-100 hover:bg-emerald-100 text-stone-600 hover:text-emerald-700 flex items-center justify-center transition-colors duration-200 shadow-xs"
+            className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-gradient-to-tr hover:from-amber-500 hover:via-rose-500 hover:to-purple-600 text-stone-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-xs hover:shadow-lg hover:shadow-rose-500/20 hover:-translate-y-0.5"
           >
-            <Instagram className="w-4 h-4" />
+            <Instagram className="w-5 h-5" />
           </a>
           <a
             href="https://twitter.com"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Twitter"
-            className="w-9 h-9 rounded-full bg-stone-100 hover:bg-emerald-100 text-stone-600 hover:text-emerald-700 flex items-center justify-center transition-colors duration-200 shadow-xs"
+            className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-sky-500 text-stone-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-xs hover:shadow-lg hover:shadow-sky-500/20 hover:-translate-y-0.5"
           >
-            <Twitter className="w-4 h-4" />
+            <Twitter className="w-5 h-5" />
           </a>
           <a
             href="https://whatsapp.com"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="WhatsApp"
-            className="w-9 h-9 rounded-full bg-stone-100 hover:bg-emerald-100 text-stone-600 hover:text-emerald-700 flex items-center justify-center transition-colors duration-200 shadow-xs"
+            className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-emerald-600 text-stone-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-xs hover:shadow-lg hover:shadow-emerald-600/20 hover:-translate-y-0.5"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-5 h-5" />
           </a>
         </div>
 

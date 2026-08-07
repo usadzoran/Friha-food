@@ -40,19 +40,41 @@ export default function App() {
               {/* BUTTON 1: مأكولات */}
               <button
                 onClick={() => setSelectedCategory('food')}
-                className="w-full sm:w-1/2 py-4 px-6 rounded-2xl font-cairo font-bold text-lg sm:text-xl flex items-center justify-center gap-3 transition-all duration-300 cursor-pointer shadow-md border bg-white text-emerald-950 border-stone-200/90 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-lg hover:scale-[1.02]"
+                className="group relative w-full sm:w-1/2 p-5 rounded-2xl font-cairo font-bold text-xl flex items-center justify-between gap-4 transition-all duration-300 cursor-pointer bg-white text-emerald-950 border border-stone-200/90 shadow-md hover:shadow-xl hover:border-emerald-500 hover:-translate-y-1 overflow-hidden"
               >
-                <Utensils className="w-6 h-6 text-emerald-600" />
-                <span>مأكولات</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-13 h-13 rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-600/30 group-hover:scale-110 transition-transform duration-300">
+                    <Utensils className="w-6 h-6 drop-shadow-xs" />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xl font-bold text-emerald-950 group-hover:text-emerald-700 transition-colors">مأكولات</span>
+                    <span className="block text-xs font-medium text-stone-400 group-hover:text-stone-500">طعام طازج، وجبات ومخبوزات</span>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white flex items-center justify-center transition-all duration-300 shrink-0">
+                  <span className="text-sm font-black transition-transform duration-300 group-hover:-translate-x-0.5">←</span>
+                </div>
               </button>
 
               {/* BUTTON 2: مشروبات */}
               <button
                 onClick={() => setSelectedCategory('drinks')}
-                className="w-full sm:w-1/2 py-4 px-6 rounded-2xl font-cairo font-bold text-lg sm:text-xl flex items-center justify-center gap-3 transition-all duration-300 cursor-pointer shadow-md border bg-white text-emerald-950 border-stone-200/90 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-lg hover:scale-[1.02]"
+                className="group relative w-full sm:w-1/2 p-5 rounded-2xl font-cairo font-bold text-xl flex items-center justify-between gap-4 transition-all duration-300 cursor-pointer bg-white text-emerald-950 border border-stone-200/90 shadow-md hover:shadow-xl hover:border-cyan-500 hover:-translate-y-1 overflow-hidden"
               >
-                <CupSoda className="w-6 h-6 text-emerald-600" />
-                <span>مشروبات</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-13 h-13 rounded-xl bg-gradient-to-br from-cyan-500 via-sky-600 to-blue-700 flex items-center justify-center text-white shadow-md shadow-cyan-600/30 group-hover:scale-110 transition-transform duration-300">
+                    <CupSoda className="w-6 h-6 drop-shadow-xs" />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xl font-bold text-emerald-950 group-hover:text-cyan-700 transition-colors">مشروبات</span>
+                    <span className="block text-xs font-medium text-stone-400 group-hover:text-stone-500">مياه، عصائر ومشروبات طاقة</span>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full bg-cyan-50 group-hover:bg-cyan-600 text-cyan-600 group-hover:text-white flex items-center justify-center transition-all duration-300 shrink-0">
+                  <span className="text-sm font-black transition-transform duration-300 group-hover:-translate-x-0.5">←</span>
+                </div>
               </button>
             </div>
           </>
