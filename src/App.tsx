@@ -1,21 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import heroImage from './assets/images/grocery_food_hero_1786092590426.jpg';
-import { Utensils, CupSoda } from 'lucide-react';
+import { Utensils, CupSoda, AlertTriangle } from 'lucide-react';
 import Footer from './components/Footer';
 import CategoryList from './components/CategoryList';
+import { AppProvider, useApp } from './context/AppContext';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminLogin from './components/admin/AdminLogin';
 
-export default function App() {
+function MainSiteContent() {
+  const { settings, isAdminLoggedIn } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<'food' | 'drinks' | null>(null);
+  const [routePath, setRoutePath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => setRoutePath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // ROUTING LOGIC FOR /admin
+  const isAdminRoute = routePath.startsWith('/admin') || routePath === '/admin';
+
+  if (isAdminRoute) {
+    if (!isAdminLoggedIn) {
+      return (
+        <AdminLogin
+          onSuccess={() => {
+            // Keep on admin route
+          }}
+          onGoHome={() => {
+            window.history.pushState({}, '', '/');
+            setRoutePath('/');
+          }}
+        />
+      );
+    }
+    return (
+      <AdminLayout
+        onGoPublicSite={() => {
+          window.history.pushState({}, '', '/');
+          setRoutePath('/');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-stone-900 flex flex-col justify-between dir-rtl antialiased selection:bg-emerald-600 selection:text-white">
+      
+      {/* STORE CLOSED NOTICE BANNER */}
+      {!settings.isStoreOpen && (
+        <div className="bg-amber-500 text-stone-950 px-4 py-2 text-center font-bold text-xs flex items-center justify-center gap-2 shadow-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>نأسف، استقبال الطلبات مغلق حالياً وسنعود للخدمة قريباً!</span>
+        </div>
+      )}
+
       <main className="max-w-6xl w-full mx-auto flex-grow flex flex-col items-center text-center space-y-8 sm:space-y-12 p-4 sm:p-8 lg:p-12">
-        {/* MAIN TITLE - GEOMETRIC KUFIC, DARK GREEN WITH SOFT SHADOW */}
+        {/* MAIN TITLE - DYNAMIC FROM SETTINGS */}
         <div className="space-y-3 pt-4 sm:pt-6">
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black font-kufi text-emerald-950 tracking-wide leading-tight drop-shadow-xs [text-shadow:_0_3px_15px_rgba(6,78,59,0.12)]">
-            اشري من دارك
+            {settings.siteName || 'اشري من دارك'}
           </h1>
           <div className="w-24 sm:w-36 h-1.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-700 mx-auto rounded-full shadow-xs opacity-90" />
+          {settings.heroSubtext && (
+            <p className="text-stone-600 text-sm sm:text-base max-w-xl mx-auto pt-1 font-medium">
+              {settings.heroSubtext}
+            </p>
+          )}
         </div>
 
         {/* CONDITIONALLY RENDER MAIN HERO / BUTTONS OR SUBCATEGORY LIST */}
@@ -27,8 +79,8 @@ export default function App() {
               
               <div className="relative rounded-2xl sm:rounded-[2rem] overflow-hidden bg-white p-2 sm:p-3 shadow-2xl shadow-emerald-950/10 border border-stone-200/80">
                 <img
-                  src={heroImage}
-                  alt="اشري من دارك - تشكيلة واسعة من الفواكه، الخضروات، المأكولات، والمنتجات الغذائية الطازجة"
+                  src={settings.heroImageUrl || heroImage}
+                  alt={settings.siteName}
                   referrerPolicy="no-referrer"
                   className="w-full h-auto max-h-[70vh] object-cover rounded-xl sm:rounded-[1.5rem] transform transition-transform duration-700 group-hover:scale-[1.01]"
                 />
@@ -92,3 +144,10 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <AppProvider>
+      <MainSiteContent />
+    </AppProvider>
+  );
+}
