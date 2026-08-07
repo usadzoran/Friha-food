@@ -4,6 +4,9 @@
   .font-traditional {
     font-family: 'Amiri', 'Traditional Arabic', 'Simplified Arabic', serif;
   }
+  .font-kufi {
+    font-family: 'Reem Kufi', 'Kufam', 'Cairo', sans-serif;
+  }
   .font-cairo {
     font-family: 'Cairo', sans-serif;
   }

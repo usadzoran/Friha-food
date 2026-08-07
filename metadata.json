@@ -1,6 +1,6 @@
 {
   "name": "اشري من دارك",
-  "description": "منصة إلكترونية لربط الزبائن بالمطاعم ومحلات المواد الغذائية مع إرسال الطلبات مباشرة عبر الواتساب وللوحة التحكم",
+  "description": "منصة طلب المواد الغذائية والمأكولات - اشري من دارك",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
