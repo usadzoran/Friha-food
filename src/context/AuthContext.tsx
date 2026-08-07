@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               username: user.email ? user.email.split('@')[0] : `user_${user.uid.slice(0, 5)}`,
               displayName: user.displayName || 'مستخدم جديد',
               photoURL: user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.uid}`,
-              role: user.email === 'admin@instaclone.com' ? 'admin' : 'user',
+              role: (user.email && user.email.toLowerCase().includes('admin')) ? 'admin' : 'user',
               status: 'active',
               createdAt: new Date().toISOString()
             };
@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       displayName: username,
       photoURL: photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
       bio: bio || 'مرحبًا بك في ملفي الشخصي!',
-      role: email === 'admin@instaclone.com' ? 'admin' : 'user',
+      role: (email.toLowerCase().includes('admin') || cleanUsername.includes('admin')) ? 'admin' : 'user',
       status: 'active',
       createdAt: new Date().toISOString()
     };

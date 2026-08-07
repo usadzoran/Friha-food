@@ -200,7 +200,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           )}
 
           {/* SUBMIT BUTTON */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
             <button
               type="submit"
               disabled={loading}
@@ -208,6 +208,31 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             >
               {isRegister ? <UserPlus className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
               <span>{loading ? 'جاري المعالجة...' : isRegister ? 'إنشاء الحساب' : 'دخول'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  await signIn('admin@instaclone.com', 'admin123');
+                  onClose();
+                } catch {
+                  try {
+                    await signUp('admin@instaclone.com', 'admin123', 'admin', '', 'حساب مسؤول النظام الرئيسي');
+                    onClose();
+                  } catch (e: any) {
+                    showToast(e.message || 'تعذر الدخول كمسؤول', 'error');
+                  }
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="w-full py-2.5 rounded-2xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2 border border-stone-200 dark:border-stone-700"
+            >
+              <Shield className="w-4 h-4 text-purple-500" />
+              <span>تسجيل دخول سريع كمسؤول (Admin Demo)</span>
             </button>
           </div>
         </form>
