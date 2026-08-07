@@ -1,14 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  doc,
-  collection,
-  onSnapshot,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+  subscribeCollection,
+  subscribeDocument,
+  createDocument,
+  updateDocument,
+  deleteDocument,
+  setDocumentMerge,
+  seedInitialDatabaseIfEmpty
+} from '../services/dbService';
 import {
   Restaurant,
   Store,
@@ -21,22 +20,22 @@ import {
   SiteSettings,
   OrderStatus
 } from '../types/admin';
-import {
-  loadFromStorage,
-  saveToStorage,
-  INITIAL_RESTAURANTS,
-  INITIAL_STORES,
-  INITIAL_CATEGORIES,
-  INITIAL_PRODUCTS,
-  INITIAL_ORDERS,
-  INITIAL_USERS,
-  INITIAL_OFFERS,
-  INITIAL_SETTINGS
-} from '../lib/store';
+import { loadFromStorage, saveToStorage, INITIAL_SETTINGS } from '../lib/store';
+
+interface ToastNotice {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
 
 interface AppContextType {
-  // Database connection indicator
+  // Database state
   isDbConnected: boolean;
+  isLoadingData: boolean;
+  toast: ToastNotice | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  clearToast: () => void;
+  seedInitialData: () => Promise<void>;
 
   // Admin Auth
   isAdminLoggedIn: boolean;
@@ -46,63 +45,74 @@ interface AppContextType {
 
   // Restaurants
   restaurants: Restaurant[];
-  addRestaurant: (rest: Omit<Restaurant, 'id'>) => Promise<void> | void;
-  updateRestaurant: (id: string, rest: Partial<Restaurant>) => Promise<void> | void;
-  deleteRestaurant: (id: string) => Promise<void> | void;
-  toggleRestaurantActive: (id: string) => Promise<void> | void;
+  addRestaurant: (rest: Omit<Restaurant, 'id'>) => Promise<void>;
+  updateRestaurant: (id: string, rest: Partial<Restaurant>) => Promise<void>;
+  deleteRestaurant: (id: string) => Promise<void>;
+  toggleRestaurantActive: (id: string) => Promise<void>;
 
   // Stores
   stores: Store[];
-  addStore: (st: Omit<Store, 'id'>) => Promise<void> | void;
-  updateStore: (id: string, st: Partial<Store>) => Promise<void> | void;
-  deleteStore: (id: string) => Promise<void> | void;
-  toggleStoreActive: (id: string) => Promise<void> | void;
+  addStore: (st: Omit<Store, 'id'>) => Promise<void>;
+  updateStore: (id: string, st: Partial<Store>) => Promise<void>;
+  deleteStore: (id: string) => Promise<void>;
+  toggleStoreActive: (id: string) => Promise<void>;
 
   // Categories
   categories: Category[];
-  addCategory: (cat: Omit<Category, 'id'>) => Promise<void> | void;
-  updateCategory: (id: string, cat: Partial<Category>) => Promise<void> | void;
-  deleteCategory: (id: string) => Promise<void> | void;
+  addCategory: (cat: Omit<Category, 'id'>) => Promise<void>;
+  updateCategory: (id: string, cat: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
   // Products
   products: Product[];
-  addProduct: (prod: Omit<Product, 'id'>) => Promise<void> | void;
-  updateProduct: (id: string, prod: Partial<Product>) => Promise<void> | void;
-  deleteProduct: (id: string) => Promise<void> | void;
-  toggleProductAvailable: (id: string) => Promise<void> | void;
+  addProduct: (prod: Omit<Product, 'id'>) => Promise<void>;
+  updateProduct: (id: string, prod: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  toggleProductAvailable: (id: string) => Promise<void>;
 
   // Orders
   orders: Order[];
-  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void> | void;
-  addOrder: (order: Omit<Order, 'id' | 'createdAt'>) => Promise<void> | void;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  addOrder: (order: Omit<Order, 'id' | 'createdAt'>) => Promise<void>;
 
   // Users
   users: UserAccount[];
-  toggleUserStatus: (id: string) => Promise<void> | void;
-  deleteUser: (id: string) => Promise<void> | void;
+  toggleUserStatus: (id: string) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
 
   // Offers
   offers: Offer[];
-  addOffer: (off: Omit<Offer, 'id'>) => Promise<void> | void;
-  deleteOffer: (id: string) => Promise<void> | void;
-  toggleOfferActive: (id: string) => Promise<void> | void;
+  addOffer: (off: Omit<Offer, 'id'>) => Promise<void>;
+  deleteOffer: (id: string) => Promise<void>;
+  toggleOfferActive: (id: string) => Promise<void>;
 
   // Media
   mediaItems: MediaItem[];
-  addMediaItem: (item: Omit<MediaItem, 'id' | 'uploadedAt'>) => Promise<void> | void;
-  deleteMediaItem: (id: string) => Promise<void> | void;
+  addMediaItem: (item: Omit<MediaItem, 'id' | 'uploadedAt'>) => Promise<void>;
+  deleteMediaItem: (id: string) => Promise<void>;
 
   // Site Settings
   settings: SiteSettings;
-  updateSettings: (newSettings: Partial<SiteSettings>) => Promise<void> | void;
+  updateSettings: (newSettings: Partial<SiteSettings>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [toast, setToast] = useState<ToastNotice | null>(null);
 
-  // Auth state
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ id: Date.now().toString(), message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
+  const clearToast = () => setToast(null);
+
+  // Admin Auth state
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() =>
     loadFromStorage('is_logged_in', false)
   );
@@ -110,219 +120,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadFromStorage('admin_email', 'admin@eshry.com')
   );
 
-  // App Data state
-  const [restaurants, setRestaurants] = useState<Restaurant[]>(() =>
-    loadFromStorage('restaurants', INITIAL_RESTAURANTS)
-  );
-  const [stores, setStores] = useState<Store[]>(() =>
-    loadFromStorage('stores', INITIAL_STORES)
-  );
-  const [categories, setCategories] = useState<Category[]>(() =>
-    loadFromStorage('categories', INITIAL_CATEGORIES)
-  );
-  const [products, setProducts] = useState<Product[]>(() =>
-    loadFromStorage('products', INITIAL_PRODUCTS)
-  );
-  const [orders, setOrders] = useState<Order[]>(() =>
-    loadFromStorage('orders', INITIAL_ORDERS)
-  );
-  const [users, setUsers] = useState<UserAccount[]>(() =>
-    loadFromStorage('users', INITIAL_USERS)
-  );
-  const [offers, setOffers] = useState<Offer[]>(() =>
-    loadFromStorage('offers', INITIAL_OFFERS)
-  );
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>(() =>
-    loadFromStorage('media', [
-      {
-        id: 'med-1',
-        name: 'grocery_food_hero.jpg',
-        url: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop&q=80',
-        size: '1.2 MB',
-        uploadedAt: '2026-08-01'
-      }
-    ])
-  );
-  const [settings, setSettings] = useState<SiteSettings>(() =>
-    loadFromStorage('settings', INITIAL_SETTINGS)
-  );
+  // App Data State loaded strictly from Firestore
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
 
-  // Sync state to localStorage as secondary offline cache
+  // Keep admin login in localStorage
   useEffect(() => saveToStorage('is_logged_in', isAdminLoggedIn), [isAdminLoggedIn]);
   useEffect(() => saveToStorage('admin_email', adminEmail), [adminEmail]);
-  useEffect(() => saveToStorage('restaurants', restaurants), [restaurants]);
-  useEffect(() => saveToStorage('stores', stores), [stores]);
-  useEffect(() => saveToStorage('categories', categories), [categories]);
-  useEffect(() => saveToStorage('products', products), [products]);
-  useEffect(() => saveToStorage('orders', orders), [orders]);
-  useEffect(() => saveToStorage('users', users), [users]);
-  useEffect(() => saveToStorage('offers', offers), [offers]);
-  useEffect(() => saveToStorage('media', mediaItems), [mediaItems]);
-  useEffect(() => saveToStorage('settings', settings), [settings]);
 
   // REALTIME FIRESTORE SUBSCRIPTIONS
   useEffect(() => {
+    setIsLoadingData(true);
+
     // 1. Settings listener
-    const unsubSettings = onSnapshot(
-      doc(db, 'settings', 'site_config'),
-      snapshot => {
+    const unsubSettings = subscribeDocument<SiteSettings>(
+      'settings',
+      'site_config',
+      (data) => {
         setIsDbConnected(true);
-        if (snapshot.exists()) {
-          setSettings(snapshot.data() as SiteSettings);
+        if (data) {
+          setSettings(data);
         } else {
-          // Seed settings to Firebase
-          setDoc(doc(db, 'settings', 'site_config'), INITIAL_SETTINGS).catch(console.error);
+          // initialize default settings in Firestore
+          setDocumentMerge('settings', 'site_config', INITIAL_SETTINGS).catch(console.error);
         }
       },
-      err => {
-        console.warn('Firestore Settings Listener error:', err);
-        setIsDbConnected(false);
-      }
+      () => setIsDbConnected(false)
     );
 
     // 2. Restaurants listener
-    const unsubRestaurants = onSnapshot(
-      collection(db, 'restaurants'),
-      snapshot => {
+    const unsubRestaurants = subscribeCollection<Restaurant>(
+      'restaurants',
+      (items) => {
         setIsDbConnected(true);
-        if (snapshot.empty) {
-          // Seed initial restaurants
-          const batch = writeBatch(db);
-          INITIAL_RESTAURANTS.forEach(r => {
-            batch.set(doc(db, 'restaurants', r.id), r);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Restaurant);
-          setRestaurants(list);
-        }
+        setRestaurants(items);
+        setIsLoadingData(false);
       },
-      err => {
-        console.warn('Firestore Restaurants error:', err);
-      }
+      () => setIsDbConnected(false)
     );
 
     // 3. Stores listener
-    const unsubStores = onSnapshot(
-      collection(db, 'stores'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_STORES.forEach(s => {
-            batch.set(doc(db, 'stores', s.id), s);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Store);
-          setStores(list);
-        }
-      },
-      err => console.warn('Firestore Stores error:', err)
-    );
+    const unsubStores = subscribeCollection<Store>('stores', (items) => {
+      setStores(items);
+    });
 
     // 4. Categories listener
-    const unsubCategories = onSnapshot(
-      collection(db, 'categories'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_CATEGORIES.forEach(c => {
-            batch.set(doc(db, 'categories', c.id), c);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Category);
-          setCategories(list);
-        }
-      },
-      err => console.warn('Firestore Categories error:', err)
-    );
+    const unsubCategories = subscribeCollection<Category>('categories', (items) => {
+      setCategories(items);
+    });
 
     // 5. Products listener
-    const unsubProducts = onSnapshot(
-      collection(db, 'products'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_PRODUCTS.forEach(p => {
-            batch.set(doc(db, 'products', p.id), p);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Product);
-          setProducts(list);
-        }
-      },
-      err => console.warn('Firestore Products error:', err)
-    );
+    const unsubProducts = subscribeCollection<Product>('products', (items) => {
+      setProducts(items);
+    });
 
     // 6. Orders listener
-    const unsubOrders = onSnapshot(
-      collection(db, 'orders'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_ORDERS.forEach(o => {
-            batch.set(doc(db, 'orders', o.id), o);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Order);
-          // sort orders by date descending
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setOrders(list);
-        }
-      },
-      err => console.warn('Firestore Orders error:', err)
-    );
+    const unsubOrders = subscribeCollection<Order>('orders', (items) => {
+      const sorted = [...items].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
+    });
 
     // 7. Users listener
-    const unsubUsers = onSnapshot(
-      collection(db, 'users'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_USERS.forEach(u => {
-            batch.set(doc(db, 'users', u.id), u);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as UserAccount);
-          setUsers(list);
-        }
-      },
-      err => console.warn('Firestore Users error:', err)
-    );
+    const unsubUsers = subscribeCollection<UserAccount>('users', (items) => {
+      setUsers(items);
+    });
 
     // 8. Offers listener
-    const unsubOffers = onSnapshot(
-      collection(db, 'offers'),
-      snapshot => {
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          INITIAL_OFFERS.forEach(off => {
-            batch.set(doc(db, 'offers', off.id), off);
-          });
-          batch.commit().catch(console.error);
-        } else {
-          const list = snapshot.docs.map(doc => doc.data() as Offer);
-          setOffers(list);
-        }
-      },
-      err => console.warn('Firestore Offers error:', err)
-    );
+    const unsubOffers = subscribeCollection<Offer>('offers', (items) => {
+      setOffers(items);
+    });
 
     // 9. Media listener
-    const unsubMedia = onSnapshot(
-      collection(db, 'media'),
-      snapshot => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(doc => doc.data() as MediaItem);
-          setMediaItems(list);
-        }
-      },
-      err => console.warn('Firestore Media error:', err)
-    );
+    const unsubMedia = subscribeCollection<MediaItem>('media', (items) => {
+      setMediaItems(items);
+    });
 
     return () => {
       unsubSettings();
@@ -339,292 +219,328 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auth Methods
   const loginAdmin = (email: string, pass: string) => {
-    if ((email === 'admin@eshry.com' && pass === 'admin123') || (email === 'admin' && pass === 'admin') || pass === 'admin123') {
+    if (
+      (email === 'admin@eshry.com' && pass === 'admin123') ||
+      (email === 'admin' && pass === 'admin') ||
+      pass === 'admin123'
+    ) {
       setIsAdminLoggedIn(true);
       setAdminEmail(email || 'admin@eshry.com');
+      showToast('تم تسجيل الدخول بنجاح', 'success');
       return true;
     }
+    showToast('بيانات الدخول غير صحيحة', 'error');
     return false;
   };
 
   const logoutAdmin = () => {
     setIsAdminLoggedIn(false);
+    showToast('تم تسجيل الخروج', 'info');
+  };
+
+  const seedInitialData = async () => {
+    try {
+      const result = await seedInitialDatabaseIfEmpty();
+      if (result) {
+        showToast('تم شحن قاعدة البيانات بالبيانات الأولية بنجاح!', 'success');
+      } else {
+        showToast('قاعدة البيانات تحتوي بالفعل على بيانات.', 'info');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('حدث خطأ أثناء شحن قاعدة البيانات', 'error');
+    }
   };
 
   // Restaurant Actions
   const addRestaurant = async (rest: Omit<Restaurant, 'id'>) => {
-    const newRest: Restaurant = { ...rest, id: `rest-${Date.now()}` };
-    setRestaurants(prev => [newRest, ...prev]);
+    const id = `rest-${Date.now()}`;
+    const newRest: Restaurant = { ...rest, id };
     try {
-      await setDoc(doc(db, 'restaurants', newRest.id), newRest);
+      await createDocument('restaurants', newRest);
+      showToast('تم إضافة المطعم بنجاح إلى قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding restaurant to Firestore:', e);
+      console.error(e);
+      showToast('فشل إضافة المطعم إلى قاعدة البيانات', 'error');
     }
   };
 
   const updateRestaurant = async (id: string, rest: Partial<Restaurant>) => {
-    setRestaurants(prev => prev.map(r => (r.id === id ? { ...r, ...rest } : r)));
     try {
-      await updateDoc(doc(db, 'restaurants', id), rest);
+      await updateDocument('restaurants', id, rest);
+      showToast('تم تحديث بيانات المطعم بنجاح', 'success');
     } catch (e) {
-      console.error('Error updating restaurant in Firestore:', e);
+      console.error(e);
+      showToast('فشل تحديث البيانات في قاعدة البيانات', 'error');
     }
   };
 
   const deleteRestaurant = async (id: string) => {
-    setRestaurants(prev => prev.filter(r => r.id !== id));
     try {
-      await deleteDoc(doc(db, 'restaurants', id));
+      await deleteDocument('restaurants', id);
+      showToast('تم حذف المطعم من قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error deleting restaurant in Firestore:', e);
+      console.error(e);
+      showToast('فشل حذف المطعم من قاعدة البيانات', 'error');
     }
   };
 
   const toggleRestaurantActive = async (id: string) => {
-    const target = restaurants.find(r => r.id === id);
+    const target = restaurants.find((r) => r.id === id);
     if (!target) return;
-    const newActive = !target.active;
-    setRestaurants(prev =>
-      prev.map(r => (r.id === id ? { ...r, active: newActive } : r))
-    );
     try {
-      await updateDoc(doc(db, 'restaurants', id), { active: newActive });
+      await updateDocument('restaurants', id, { active: !target.active });
+      showToast('تم تغيير حالة المطعم بنجاح', 'info');
     } catch (e) {
-      console.error('Error toggling restaurant active in Firestore:', e);
+      console.error(e);
+      showToast('فشل تغيير الحالة', 'error');
     }
   };
 
   // Store Actions
   const addStore = async (st: Omit<Store, 'id'>) => {
-    const newSt: Store = { ...st, id: `store-${Date.now()}` };
-    setStores(prev => [newSt, ...prev]);
+    const id = `store-${Date.now()}`;
+    const newSt: Store = { ...st, id };
     try {
-      await setDoc(doc(db, 'stores', newSt.id), newSt);
+      await createDocument('stores', newSt);
+      showToast('تم إضافة المتجر بنجاح إلى قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding store to Firestore:', e);
+      console.error(e);
+      showToast('فشل إضافة المتجر', 'error');
     }
   };
 
   const updateStore = async (id: string, st: Partial<Store>) => {
-    setStores(prev => prev.map(s => (s.id === id ? { ...s, ...st } : s)));
     try {
-      await updateDoc(doc(db, 'stores', id), st);
+      await updateDocument('stores', id, st);
+      showToast('تم تحديث المتجر بنجاح', 'success');
     } catch (e) {
-      console.error('Error updating store in Firestore:', e);
+      console.error(e);
+      showToast('فشل التحديث', 'error');
     }
   };
 
   const deleteStore = async (id: string) => {
-    setStores(prev => prev.filter(s => s.id !== id));
     try {
-      await deleteDoc(doc(db, 'stores', id));
+      await deleteDocument('stores', id);
+      showToast('تم حذف المتجر بنجاح', 'success');
     } catch (e) {
-      console.error('Error deleting store in Firestore:', e);
+      console.error(e);
+      showToast('فشل الحذف', 'error');
     }
   };
 
   const toggleStoreActive = async (id: string) => {
-    const target = stores.find(s => s.id === id);
+    const target = stores.find((s) => s.id === id);
     if (!target) return;
-    const newActive = !target.active;
-    setStores(prev =>
-      prev.map(s => (s.id === id ? { ...s, active: newActive } : s))
-    );
     try {
-      await updateDoc(doc(db, 'stores', id), { active: newActive });
+      await updateDocument('stores', id, { active: !target.active });
+      showToast('تم تغيير حالة المتجر', 'info');
     } catch (e) {
-      console.error('Error toggling store active in Firestore:', e);
+      console.error(e);
+      showToast('فشل تغيير حالة المتجر', 'error');
     }
   };
 
   // Category Actions
   const addCategory = async (cat: Omit<Category, 'id'>) => {
-    const newCat: Category = { ...cat, id: `cat-${Date.now()}` };
-    setCategories(prev => [...prev, newCat]);
+    const id = `cat-${Date.now()}`;
+    const newCat: Category = { ...cat, id };
     try {
-      await setDoc(doc(db, 'categories', newCat.id), newCat);
+      await createDocument('categories', newCat);
+      showToast('تم إضافة القسم بنجاح إلى قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding category to Firestore:', e);
+      console.error(e);
+      showToast('فشل إضافة القسم', 'error');
     }
   };
 
   const updateCategory = async (id: string, cat: Partial<Category>) => {
-    setCategories(prev => prev.map(c => (c.id === id ? { ...c, ...cat } : c)));
     try {
-      await updateDoc(doc(db, 'categories', id), cat);
+      await updateDocument('categories', id, cat);
+      showToast('تم تحديث القسم بنجاح', 'success');
     } catch (e) {
-      console.error('Error updating category in Firestore:', e);
+      console.error(e);
+      showToast('فشل تحديث القسم', 'error');
     }
   };
 
   const deleteCategory = async (id: string) => {
-    setCategories(prev => prev.filter(c => c.id !== id));
     try {
-      await deleteDoc(doc(db, 'categories', id));
+      await deleteDocument('categories', id);
+      showToast('تم حذف القسم بنجاح', 'success');
     } catch (e) {
-      console.error('Error deleting category in Firestore:', e);
+      console.error(e);
+      showToast('فشل حذف القسم', 'error');
     }
   };
 
   // Product Actions
   const addProduct = async (prod: Omit<Product, 'id'>) => {
-    const newProd: Product = { ...prod, id: `prod-${Date.now()}` };
-    setProducts(prev => [newProd, ...prev]);
+    const id = `prod-${Date.now()}`;
+    const newProd: Product = { ...prod, id };
     try {
-      await setDoc(doc(db, 'products', newProd.id), newProd);
+      await createDocument('products', newProd);
+      showToast('تم إضافة المنتج بنجاح إلى قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding product to Firestore:', e);
+      console.error(e);
+      showToast('فشل إضافة المنتج', 'error');
     }
   };
 
   const updateProduct = async (id: string, prod: Partial<Product>) => {
-    setProducts(prev => prev.map(p => (p.id === id ? { ...p, ...prod } : p)));
     try {
-      await updateDoc(doc(db, 'products', id), prod);
+      await updateDocument('products', id, prod);
+      showToast('تم تحديث المنتج بنجاح', 'success');
     } catch (e) {
-      console.error('Error updating product in Firestore:', e);
+      console.error(e);
+      showToast('فشل تحديث المنتج', 'error');
     }
   };
 
   const deleteProduct = async (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
     try {
-      await deleteDoc(doc(db, 'products', id));
+      await deleteDocument('products', id);
+      showToast('تم حذف المنتج من قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error deleting product in Firestore:', e);
+      console.error(e);
+      showToast('فشل حذف المنتج', 'error');
     }
   };
 
   const toggleProductAvailable = async (id: string) => {
-    const target = products.find(p => p.id === id);
+    const target = products.find((p) => p.id === id);
     if (!target) return;
-    const newAvail = !target.isAvailable;
-    setProducts(prev =>
-      prev.map(p => (p.id === id ? { ...p, isAvailable: newAvail } : p))
-    );
     try {
-      await updateDoc(doc(db, 'products', id), { isAvailable: newAvail });
+      await updateDocument('products', id, { isAvailable: !target.isAvailable });
+      showToast('تم تعديل توفر المنتج', 'info');
     } catch (e) {
-      console.error('Error toggling product available in Firestore:', e);
+      console.error(e);
+      showToast('فشل التعديل', 'error');
     }
   };
 
   // Order Actions
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
-    setOrders(prev =>
-      prev.map(o => (o.id === id ? { ...o, status } : o))
-    );
     try {
-      await updateDoc(doc(db, 'orders', id), { status });
+      await updateDocument('orders', id, { status });
+      showToast('تم تحديث حالة الطلب في قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error updating order status in Firestore:', e);
+      console.error(e);
+      showToast('فشل تحديث حالة الطلب', 'error');
     }
   };
 
   const addOrder = async (order: Omit<Order, 'id' | 'createdAt'>) => {
+    const id = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newOrder: Order = {
       ...order,
-      id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+      id,
       createdAt: new Date().toISOString()
     };
-    setOrders(prev => [newOrder, ...prev]);
     try {
-      await setDoc(doc(db, 'orders', newOrder.id), newOrder);
+      await createDocument('orders', newOrder);
+      showToast('تم إرسال الطلب وحفظه في قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding order to Firestore:', e);
+      console.error(e);
+      showToast('فشل إرسال الطلب', 'error');
     }
   };
 
   // User Actions
   const toggleUserStatus = async (id: string) => {
-    const target = users.find(u => u.id === id);
+    const target = users.find((u) => u.id === id);
     if (!target) return;
     const newStatus = target.status === 'active' ? 'blocked' : 'active';
-    setUsers(prev =>
-      prev.map(u => (u.id === id ? { ...u, status: newStatus } : u))
-    );
     try {
-      await updateDoc(doc(db, 'users', id), { status: newStatus });
+      await updateDocument('users', id, { status: newStatus });
+      showToast('تم تحديث حالة المستخدم في قاعدة البيانات', 'info');
     } catch (e) {
-      console.error('Error toggling user status in Firestore:', e);
+      console.error(e);
+      showToast('فشل التحديث', 'error');
     }
   };
 
   const deleteUser = async (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
     try {
-      await deleteDoc(doc(db, 'users', id));
+      await deleteDocument('users', id);
+      showToast('تم حذف حساب المستخدم بنجاح', 'success');
     } catch (e) {
-      console.error('Error deleting user in Firestore:', e);
+      console.error(e);
+      showToast('فشل حذف المستخدم', 'error');
     }
   };
 
   // Offer Actions
   const addOffer = async (off: Omit<Offer, 'id'>) => {
-    const newOffer: Offer = { ...off, id: `off-${Date.now()}` };
-    setOffers(prev => [newOffer, ...prev]);
+    const id = `off-${Date.now()}`;
+    const newOffer: Offer = { ...off, id };
     try {
-      await setDoc(doc(db, 'offers', newOffer.id), newOffer);
+      await createDocument('offers', newOffer);
+      showToast('تم إضافة العرض بنجاح إلى قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding offer to Firestore:', e);
+      console.error(e);
+      showToast('فشل إضافة العرض', 'error');
     }
   };
 
   const deleteOffer = async (id: string) => {
-    setOffers(prev => prev.filter(o => o.id !== id));
     try {
-      await deleteDoc(doc(db, 'offers', id));
+      await deleteDocument('offers', id);
+      showToast('تم حذف العرض بنجاح', 'success');
     } catch (e) {
-      console.error('Error deleting offer in Firestore:', e);
+      console.error(e);
+      showToast('فشل حذف العرض', 'error');
     }
   };
 
   const toggleOfferActive = async (id: string) => {
-    const target = offers.find(o => o.id === id);
+    const target = offers.find((o) => o.id === id);
     if (!target) return;
-    const newActive = !target.active;
-    setOffers(prev =>
-      prev.map(o => (o.id === id ? { ...o, active: newActive } : o))
-    );
     try {
-      await updateDoc(doc(db, 'offers', id), { active: newActive });
+      await updateDocument('offers', id, { active: !target.active });
+      showToast('تم تغيير حالة العرض', 'info');
     } catch (e) {
-      console.error('Error toggling offer active in Firestore:', e);
+      console.error(e);
+      showToast('فشل تعديل العرض', 'error');
     }
   };
 
   // Media Actions
   const addMediaItem = async (item: Omit<MediaItem, 'id' | 'uploadedAt'>) => {
+    const id = `med-${Date.now()}`;
     const newItem: MediaItem = {
       ...item,
-      id: `med-${Date.now()}`,
+      id,
       uploadedAt: new Date().toISOString().split('T')[0]
     };
-    setMediaItems(prev => [newItem, ...prev]);
     try {
-      await setDoc(doc(db, 'media', newItem.id), newItem);
+      await createDocument('media', newItem);
+      showToast('تم حفظ الوسائط في قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error adding media item to Firestore:', e);
+      console.error(e);
+      showToast('فشل حفظ الوسائط', 'error');
     }
   };
 
   const deleteMediaItem = async (id: string) => {
-    setMediaItems(prev => prev.filter(m => m.id !== id));
     try {
-      await deleteDoc(doc(db, 'media', id));
+      await deleteDocument('media', id);
+      showToast('تم حذف الوسائط من قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error deleting media item in Firestore:', e);
+      console.error(e);
+      showToast('فشل الحذف', 'error');
     }
   };
 
   // Settings Actions
   const updateSettings = async (newSettings: Partial<SiteSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
     try {
-      await setDoc(doc(db, 'settings', 'site_config'), updated, { merge: true });
+      await setDocumentMerge('settings', 'site_config', newSettings);
+      showToast('تم حفظ إعدادات الموقع بنجاح في قاعدة البيانات', 'success');
     } catch (e) {
-      console.error('Error updating settings in Firestore:', e);
+      console.error(e);
+      showToast('فشل حفظ الإعدادات', 'error');
     }
   };
 
@@ -632,6 +548,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         isDbConnected,
+        isLoadingData,
+        toast,
+        showToast,
+        clearToast,
+        seedInitialData,
         isAdminLoggedIn,
         adminEmail,
         loginAdmin,
@@ -673,6 +594,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }}
     >
       {children}
+      {/* Toast Notification Container */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-sm">
+          <div
+            className={`px-4 py-3 rounded-2xl shadow-2xl border text-sm font-bold flex items-center justify-between gap-3 text-right dir-rtl ${
+              toast.type === 'success'
+                ? 'bg-emerald-950 text-emerald-200 border-emerald-800'
+                : toast.type === 'error'
+                ? 'bg-rose-950 text-rose-200 border-rose-800'
+                : 'bg-stone-900 text-stone-200 border-stone-700'
+            }`}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={clearToast}
+              className="text-stone-400 hover:text-white transition-colors cursor-pointer text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 };
@@ -684,4 +627,3 @@ export const useApp = () => {
   }
   return context;
 };
-

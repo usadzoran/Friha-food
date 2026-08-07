@@ -3,15 +3,24 @@ import { useApp } from '../../context/AppContext';
 import { Settings, Save, Power, Phone, MessageSquare, Globe, Check, AlertCircle } from 'lucide-react';
 
 export default function SettingsTab() {
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings, seedInitialData, isDbConnected } = useApp();
   const [formData, setFormData] = useState({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings(formData);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleSeedDatabase = async () => {
+    if (confirm('هل ترغب في شحن قاعدة البيانات بالسجلات والبيانات الأولية؟')) {
+      setIsSeeding(true);
+      await seedInitialData();
+      setIsSeeding(false);
+    }
   };
 
   return (
@@ -173,6 +182,30 @@ export default function SettingsTab() {
                 className="w-full bg-stone-950 border border-stone-800 focus:border-emerald-500 rounded-xl py-3 px-4 text-stone-100 text-sm focus:outline-none dir-ltr"
               />
             </div>
+          </div>
+        </div>
+
+        {/* DATABASE OPERATIONS CARD */}
+        <div className="bg-stone-900 border border-stone-800 p-6 rounded-2xl space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white font-kufi flex items-center gap-2">
+                <Globe className="w-5 h-5 text-emerald-400" />
+                <span>إدارة قاعدة البيانات المباشرة (Firebase Firestore)</span>
+              </h3>
+              <p className="text-xs text-stone-400">
+                حالة الاتصال: {isDbConnected ? 'متصل بنجاح 🟢' : 'جاري الاتصال 🟡'} — جميع البيانات تُقرأ وتُكتب مباشرة في قاعدة البيانات.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSeedDatabase}
+              disabled={isSeeding}
+              className="px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 transition-all cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
+            >
+              <span>{isSeeding ? 'جاري شحن قاعدة البيانات...' : 'شحن البيانات الأولية لقاعدة البيانات'}</span>
+            </button>
           </div>
         </div>
 
