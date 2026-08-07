@@ -10,6 +10,8 @@ import AdminLogin from './components/admin/AdminLogin';
 function MainSiteContent() {
   const { settings, isAdminLoggedIn } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<'food' | 'drinks' | null>(null);
+  const [clickCount, setClickCount] = useState(0);
+
   const checkIsAdminRoute = () => {
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
@@ -18,9 +20,10 @@ function MainSiteContent() {
       path === '/admin' ||
       path.startsWith('/admin/') ||
       hash === '#admin' ||
+      hash === '#/admin' ||
+      hash.startsWith('#admin') ||
       hash.startsWith('#/admin') ||
-      search.includes('admin=true') ||
-      search.includes('page=admin')
+      search.includes('admin')
     );
   };
 
@@ -38,6 +41,21 @@ function MainSiteContent() {
       window.removeEventListener('hashchange', handleLocationChange);
     };
   }, []);
+
+  const handleTitleSecretClick = () => {
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+
+    if (newCount >= 3) {
+      setClickCount(0);
+      window.history.pushState({}, '', '/admin');
+      setIsAdminRoute(true);
+    }
+
+    setTimeout(() => {
+      setClickCount(0);
+    }, 1500);
+  };
 
   const navigateToHome = () => {
     window.history.pushState({}, '', '/');
@@ -75,8 +93,12 @@ function MainSiteContent() {
 
       <main className="max-w-6xl w-full mx-auto flex-grow flex flex-col items-center text-center space-y-8 sm:space-y-12 p-4 sm:p-8 lg:p-12">
         {/* MAIN TITLE - DYNAMIC FROM SETTINGS */}
-        <div className="space-y-3 pt-4 sm:pt-6">
-          <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black font-kufi text-emerald-950 tracking-wide leading-tight drop-shadow-xs [text-shadow:_0_3px_15px_rgba(6,78,59,0.12)]">
+        <div className="space-y-3 pt-4 sm:pt-6 select-none">
+          <h1
+            onClick={handleTitleSecretClick}
+            className="text-5xl sm:text-7xl lg:text-8xl font-black font-kufi text-emerald-950 tracking-wide leading-tight drop-shadow-xs [text-shadow:_0_3px_15px_rgba(6,78,59,0.12)] cursor-pointer"
+            title="انقر 3 مرات سريعة للدخول السري للوحة الإدارة"
+          >
             {settings.siteName || 'اشري من دارك'}
           </h1>
           <div className="w-24 sm:w-36 h-1.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-700 mx-auto rounded-full shadow-xs opacity-90" />

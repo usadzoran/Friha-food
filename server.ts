@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 
@@ -24,6 +25,20 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Handle SPA fallback for client routes (like /admin) in dev mode
+    app.get('*', async (req, res, next) => {
+      try {
+        const url = req.originalUrl;
+        const indexPath = path.resolve(__dirname, 'index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        const html = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(html);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
