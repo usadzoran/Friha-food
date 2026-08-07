@@ -53,13 +53,24 @@ export default function Footer() {
           </a>
         </div>
 
-        {/* PRIVACY POLICY LINK */}
-        <div className="order-2 md:order-3">
+        {/* PRIVACY POLICY & ADMIN LINKS */}
+        <div className="order-2 md:order-3 flex items-center justify-center gap-4">
           <button
             onClick={() => setShowPrivacyModal(true)}
             className="text-xs sm:text-sm font-semibold text-stone-600 hover:text-emerald-700 transition-colors duration-200 cursor-pointer underline decoration-stone-300 underline-offset-4 hover:decoration-emerald-500"
           >
             سياسة الخصوصية
+          </button>
+          <span className="text-stone-300">•</span>
+          <button
+            onClick={() => {
+              window.history.pushState({}, '', '/admin');
+              window.dispatchEvent(new Event('popstate'));
+            }}
+            className="text-xs sm:text-sm font-semibold text-stone-600 hover:text-emerald-700 transition-colors duration-200 cursor-pointer flex items-center gap-1.5 hover:underline"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>لوحة الإدارة</span>
           </button>
         </div>
       </div>
