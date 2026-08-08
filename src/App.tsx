@@ -558,86 +558,125 @@ export default function App() {
                     <p className="text-xs text-slate-500">يمكنك مشاهدة جميع المنتجات في تبويب "جميع المنتجات" أعلاه أو إنشاء قسم جديد من لوحة التحكم.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {filteredCategories.map((cat) => {
-                      const prodCount = products.filter((p) => p.category_id === cat.id || p.category_id === cat.name).length;
-                      const coverImg = getCategoryCover(cat);
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                      {filteredCategories.map((cat) => {
+                        const prodCount = products.filter((p) => p.category_id === cat.id || p.category_id === cat.name).length;
+                        const coverImg = getCategoryCover(cat);
 
-                      return (
-                        <div
-                          key={cat.id}
-                          onClick={() => navigateToCategory(cat.id)}
-                          className="group relative bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
-                        >
-                          {/* Cover Image & Gradient Overlay */}
-                          <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-100">
-                            <img
-                              src={coverImg}
-                              alt={cat.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/25 to-transparent" />
+                        return (
+                          <div
+                            key={cat.id}
+                            onClick={() => navigateToCategory(cat.id)}
+                            className="group relative bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
+                          >
+                            {/* Cover Image & Gradient Overlay */}
+                            <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-100">
+                              <img
+                                src={coverImg}
+                                alt={cat.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/25 to-transparent" />
 
-                            {/* Product Count Badge */}
-                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-black text-slate-800 shadow-xs border border-white/40 flex items-center gap-1">
-                              <Package className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>{prodCount} منتج متوفر</span>
+                              {/* Product Count Badge */}
+                              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-black text-slate-800 shadow-xs border border-white/40 flex items-center gap-1">
+                                <Package className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{prodCount} منتج متوفر</span>
+                              </div>
+
+                              {/* Category Title */}
+                              <div className="absolute bottom-3 right-3 left-3 text-white">
+                                <h3 className="text-lg sm:text-xl font-black drop-shadow-xs line-clamp-1">
+                                  {cat.name}
+                                </h3>
+                              </div>
                             </div>
 
-                            {/* Category Title */}
+                            {/* Card Footer Bar */}
+                            <div className="p-3.5 bg-white flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-emerald-700 transition-colors border-t border-slate-100">
+                              <span className="flex items-center gap-1.5 text-emerald-700 font-extrabold">
+                                <span>تصفح المنتجات</span>
+                                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                              </span>
+                              <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                اضغط للعرض
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Uncategorized products card if any exist */}
+                      {products.some(p => !p.category_id || !categories.some(c => c.id === p.category_id || c.name === p.category_id)) && (
+                        <div
+                          onClick={() => navigateToCategory('general')}
+                          className="group relative bg-amber-50/60 rounded-3xl border border-amber-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
+                        >
+                          <div className="relative aspect-16/10 w-full overflow-hidden bg-amber-100 flex items-center justify-center">
+                            <Package className="w-16 h-16 text-amber-500/60 group-hover:scale-110 transition-transform" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+
+                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-black text-slate-800 shadow-xs border border-white/40 flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5 text-amber-600" />
+                              <span>
+                                {products.filter(p => !p.category_id || !categories.some(c => c.id === p.category_id || c.name === p.category_id)).length} منتج
+                              </span>
+                            </div>
+
                             <div className="absolute bottom-3 right-3 left-3 text-white">
-                              <h3 className="text-lg sm:text-xl font-black drop-shadow-xs line-clamp-1">
-                                {cat.name}
+                              <h3 className="text-lg sm:text-xl font-black drop-shadow-xs">
+                                منتجات عامة / غير مصنفة
                               </h3>
                             </div>
                           </div>
 
-                          {/* Card Footer Bar */}
-                          <div className="p-3.5 bg-white flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-emerald-700 transition-colors border-t border-slate-100">
-                            <span className="flex items-center gap-1.5 text-emerald-700 font-extrabold">
-                              <span>تصفح المنتجات</span>
+                          <div className="p-3.5 bg-white flex items-center justify-between text-xs font-bold text-amber-800 group-hover:text-amber-900 transition-colors border-t border-amber-100">
+                            <span className="flex items-center gap-1.5 font-extrabold">
+                              <span>عرض المنتجات العامة</span>
                               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                             </span>
-                            <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                            <span className="text-[11px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
                               اضغط للعرض
                             </span>
                           </div>
                         </div>
-                      );
-                    })}
+                      )}
+                    </div>
 
-                    {/* Uncategorized products card if any exist */}
-                    {products.some(p => !p.category_id || !categories.some(c => c.id === p.category_id || c.name === p.category_id)) && (
-                      <div
-                        onClick={() => navigateToCategory('general')}
-                        className="group relative bg-amber-50/60 rounded-3xl border border-amber-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
-                      >
-                        <div className="relative aspect-16/10 w-full overflow-hidden bg-amber-100 flex items-center justify-center">
-                          <Package className="w-16 h-16 text-amber-500/60 group-hover:scale-110 transition-transform" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-
-                          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-black text-slate-800 shadow-xs border border-white/40 flex items-center gap-1">
-                            <Package className="w-3.5 h-3.5 text-amber-600" />
-                            <span>
-                              {products.filter(p => !p.category_id || !categories.some(c => c.id === p.category_id || c.name === p.category_id)).length} منتج
-                            </span>
-                          </div>
-
-                          <div className="absolute bottom-3 right-3 left-3 text-white">
-                            <h3 className="text-lg sm:text-xl font-black drop-shadow-xs">
-                              منتجات عامة / غير مصنفة
+                    {/* Section: Latest Products Showcase on Home Page */}
+                    {products.length > 0 && (
+                      <div className="pt-6 space-y-4 border-t border-slate-200/80">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                              <Sparkles className="w-5 h-5 text-amber-500" />
+                              <span>أحدث المنتجات المتوفرة</span>
+                              <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">
+                                {products.length} منتج
+                              </span>
                             </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">تصفح واطلب أحدث المنتجات المضافة للمتجر</p>
                           </div>
+                          <button
+                            onClick={() => setHomeTab('all_products')}
+                            className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                          >
+                            <span>عرض كل المنتجات ({products.length})</span>
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
-                        <div className="p-3.5 bg-white flex items-center justify-between text-xs font-bold text-amber-800 group-hover:text-amber-900 transition-colors border-t border-amber-100">
-                          <span className="flex items-center gap-1.5 font-extrabold">
-                            <span>عرض المنتجات العامة</span>
-                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                          </span>
-                          <span className="text-[11px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
-                            اضغط للعرض
-                          </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                          {products.slice(0, 8).map((prod) => (
+                            <ProductCard
+                              key={prod.id}
+                              product={prod}
+                              onSelect={(p) => setSelectedProduct(p)}
+                              onAddToCart={(p) => handleAddToCart(p, 1)}
+                              isAdded={addedItemIds.has(prod.id)}
+                            />
+                          ))}
                         </div>
                       </div>
                     )}

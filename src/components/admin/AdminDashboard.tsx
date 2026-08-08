@@ -43,7 +43,8 @@ import {
   Globe,
   MousePointerClick,
   RotateCcw,
-  Database
+  Database,
+  Loader2
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -69,6 +70,51 @@ const PRESET_IMAGES = [
   { label: 'صحة وجمال', url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80' }
 ];
 
+// Helper function to compress uploaded image files before saving to Firestore (ensures <100KB)
+const compressImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve(compressedDataUrl);
+        } else {
+          resolve(e.target?.result as string);
+        }
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
   categories,
@@ -79,6 +125,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Submitting and compressing states
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
+  const [isCompressingCatImage, setIsCompressingCatImage] = useState(false);
 
   const handleRestoreDefaultData = async () => {
     if (!window.confirm('هل تريد استرجاع وإعادة تحميل الأقسام والمنتجات الأساسية في قاعدة البيانات؟')) return;
@@ -156,21 +208,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsProductModalOpen(true);
   };
 
-  // File Upload Handler (Convert file to Base64 data URL)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Handler (Compress & Convert file to Base64 data URL)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً. يرجى اختيار صورة أقل من 2 ميغابايت.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setProdForm((prev) => ({ ...prev, image_url: reader.result as string }));
+      setIsCompressingImage(true);
+      try {
+        const compressedBase64 = await compressImageFile(file);
+        if (compressedBase64) {
+          setProdForm((prev) => ({ ...prev, image_url: compressedBase64 }));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error compressing image:', err);
+      } finally {
+        setIsCompressingImage(false);
+      }
     }
   };
 
@@ -183,33 +235,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    const defaultImg = PRESET_IMAGES[0].url;
-    const finalImage = prodForm.image_url.trim() || defaultImg;
+    try {
+      setIsSubmittingProduct(true);
+      const defaultImg = PRESET_IMAGES[0].url;
+      const finalImage = prodForm.image_url.trim() || defaultImg;
 
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, {
-        name: prodForm.name.trim(),
-        category_id: prodForm.category_id,
-        description: prodForm.description.trim(),
-        price: priceNum,
-        image_url: finalImage,
-        active: prodForm.active
-      });
-      setSuccessNotice('تم تعديل المنتج والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
-    } else {
-      await addProduct({
-        name: prodForm.name.trim(),
-        category_id: prodForm.category_id,
-        description: prodForm.description.trim(),
-        price: priceNum,
-        image_url: finalImage,
-        active: prodForm.active !== false
-      });
-      setSuccessNotice('تم إضافة المنتج الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, {
+          name: prodForm.name.trim(),
+          category_id: prodForm.category_id,
+          description: prodForm.description.trim(),
+          price: priceNum,
+          image_url: finalImage,
+          active: prodForm.active
+        });
+        setSuccessNotice('تم تعديل المنتج والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      } else {
+        await addProduct({
+          name: prodForm.name.trim(),
+          category_id: prodForm.category_id,
+          description: prodForm.description.trim(),
+          price: priceNum,
+          image_url: finalImage,
+          active: prodForm.active !== false
+        });
+        setSuccessNotice('تم إضافة المنتج الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      }
+
+      setTimeout(() => setSuccessNotice(null), 5000);
+      setIsProductModalOpen(false);
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('حدث خطأ أثناء حفظ المنتج: ' + (error as Error).message);
+    } finally {
+      setIsSubmittingProduct(false);
     }
-
-    setTimeout(() => setSuccessNotice(null), 5000);
-    setIsProductModalOpen(false);
   };
 
   // Category handlers
@@ -227,20 +287,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsCategoryModalOpen(true);
   };
 
-  const handleCategoryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً. يرجى اختيار صورة أقل من 2 ميغابايت.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setCatForm((prev) => ({ ...prev, image_url: reader.result as string }));
+      setIsCompressingCatImage(true);
+      try {
+        const compressedBase64 = await compressImageFile(file);
+        if (compressedBase64) {
+          setCatForm((prev) => ({ ...prev, image_url: compressedBase64 }));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error compressing category image:', err);
+      } finally {
+        setIsCompressingCatImage(false);
+      }
     }
   };
 
@@ -248,26 +308,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     if (!catForm.name.trim()) return;
 
-    const finalImage = catForm.image_url.trim() || PRESET_IMAGES[0].url;
+    try {
+      setIsSubmittingCategory(true);
+      const finalImage = catForm.image_url.trim() || PRESET_IMAGES[0].url;
 
-    if (editingCategory) {
-      await updateCategory(editingCategory.id, {
-        name: catForm.name.trim(),
-        icon: catForm.icon,
-        image_url: finalImage
-      });
-      setSuccessNotice('تم تعديل القسم والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
-    } else {
-      await addCategory({
-        name: catForm.name.trim(),
-        icon: catForm.icon,
-        image_url: finalImage
-      });
-      setSuccessNotice('تم إضافة القسم الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, {
+          name: catForm.name.trim(),
+          icon: catForm.icon,
+          image_url: finalImage
+        });
+        setSuccessNotice('تم تعديل القسم والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      } else {
+        await addCategory({
+          name: catForm.name.trim(),
+          icon: catForm.icon,
+          image_url: finalImage
+        });
+        setSuccessNotice('تم إضافة القسم الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+      }
+
+      setTimeout(() => setSuccessNotice(null), 5000);
+      setIsCategoryModalOpen(false);
+    } catch (error) {
+      console.error('Error saving category:', error);
+      alert('حدث خطأ أثناء حفظ القسم: ' + (error as Error).message);
+    } finally {
+      setIsSubmittingCategory(false);
     }
-
-    setTimeout(() => setSuccessNotice(null), 5000);
-    setIsCategoryModalOpen(false);
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
@@ -1392,11 +1460,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={handleFileUpload}
                       id="productImageFileInput"
                       className="hidden"
+                      disabled={isCompressingImage || isSubmittingProduct}
                     />
                     <label htmlFor="productImageFileInput" className="cursor-pointer block space-y-1.5">
-                      <Upload className="w-7 h-7 text-emerald-600 mx-auto" />
-                      <span className="block text-xs font-bold text-slate-700">اضغط هنا لاختيار صورة من حاسوبك أو هاتفك</span>
-                      <span className="block text-[10px] text-slate-400">تُقبل صور PNG, JPG, WEBP بحد أقصى 2MB</span>
+                      {isCompressingImage ? (
+                        <div className="flex flex-col items-center gap-1.5 text-emerald-700 py-2">
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          <span className="text-xs font-bold">جاري ضغط ومعالجة الصورة...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-7 h-7 text-emerald-600 mx-auto" />
+                          <span className="block text-xs font-bold text-slate-700">اضغط هنا لاختيار صورة من حاسوبك أو هاتفك</span>
+                          <span className="block text-[10px] text-slate-400">سيتم ضغط وتصغير حجم الصورة تلقائياً لحفظ السرعة</span>
+                        </>
+                      )}
                     </label>
                   </div>
                 )}
@@ -1469,15 +1547,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                  disabled={isSubmittingProduct}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl disabled:opacity-50"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                  disabled={isSubmittingProduct || isCompressingImage}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-2"
                 >
-                  حفظ التغييرات
+                  {isSubmittingProduct && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>{isSubmittingProduct ? 'جاري الحفظ والمزامنة...' : 'حفظ التغييرات'}</span>
                 </button>
               </div>
             </form>
@@ -1564,10 +1645,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={handleCategoryFileUpload}
                       className="hidden"
                       id="catImageFileInput"
+                      disabled={isCompressingCatImage || isSubmittingCategory}
                     />
                     <label htmlFor="catImageFileInput" className="cursor-pointer space-y-1 block">
-                      <Upload className="w-6 h-6 text-emerald-600 mx-auto" />
-                      <span className="text-xs font-bold text-slate-700 block">اختر صورة من جهازك</span>
+                      {isCompressingCatImage ? (
+                        <div className="flex flex-col items-center gap-1.5 text-emerald-700 py-1">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="text-xs font-bold">جاري ضغط ومعالجة الغلاف...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-6 h-6 text-emerald-600 mx-auto" />
+                          <span className="text-xs font-bold text-slate-700 block">اختر صورة غلاف من جهازك</span>
+                        </>
+                      )}
                     </label>
                   </div>
                 )}
@@ -1595,15 +1686,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                  disabled={isSubmittingCategory}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl disabled:opacity-50"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                  disabled={isSubmittingCategory || isCompressingCatImage}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-2"
                 >
-                  حفظ القسم
+                  {isSubmittingCategory && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>{isSubmittingCategory ? 'جاري الحفظ...' : 'حفظ القسم'}</span>
                 </button>
               </div>
             </form>
