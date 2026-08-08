@@ -1,258 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import {
-  Compass,
-  PlusSquare,
-  Search,
-  User,
-  Shield,
-  Sun,
-  Moon,
-  LogOut,
-  LogIn,
-  Bell,
-  Heart,
-  Sparkles
+import React, { useState } from 'react';
+import { 
+  Store, 
+  Search, 
+  MapPin, 
+  ShoppingBag, 
+  Heart, 
+  X, 
+  Sparkles,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
-import { subscribeNotifications } from '../services/socialService';
-import { Notification } from '../types';
+import { FilterOptions } from '../types';
 
 interface NavbarProps {
-  onOpenAuth: () => void;
+  filterOptions: FilterOptions;
+  setFilterOptions: React.Dispatch<React.SetStateAction<FilterOptions>>;
+  favoritesCount: number;
+  cartCount: number;
+  onOpenCart: () => void;
+  onOpenFavorites: () => void;
+  userAddress: string;
+  setUserAddress: (address: string) => void;
 }
 
-export default function Navbar({ onOpenAuth }: NavbarProps) {
-  const {
-    currentUser,
-    signOut,
-    activeTab,
-    setActiveTab,
-    selectedUserId,
-    setSelectedUserId,
-    darkMode,
-    toggleDarkMode
-  } = useAuth();
+export const Navbar: React.FC<NavbarProps> = ({
+  filterOptions,
+  setFilterOptions,
+  favoritesCount,
+  cartCount,
+  onOpenCart,
+  onOpenFavorites,
+  userAddress,
+  setUserAddress,
+}) => {
+  const [isChangingAddress, setIsChangingAddress] = useState(false);
+  const [tempAddress, setTempAddress] = useState(userAddress);
 
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotifMenu, setShowNotifMenu] = useState(false);
-
-  useEffect(() => {
-    if (currentUser?.uid) {
-      const unsub = subscribeNotifications(currentUser.uid, (notifs) => {
-        setNotifications(notifs);
-      });
-      return () => unsub();
+  const handleAddressSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tempAddress.trim()) {
+      setUserAddress(tempAddress.trim());
+      setIsChangingAddress(false);
     }
-  }, [currentUser]);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  };
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-stone-900/80 border-b border-stone-200 dark:border-stone-800 transition-colors">
-      <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between dir-rtl">
-        
-        {/* LOGO */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setSelectedUserId(null);
-              setActiveTab('home');
-            }}
-            className="flex items-center gap-2 group cursor-pointer text-right"
-          >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 p-0.5 shadow-md shadow-pink-500/20 group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-white dark:bg-stone-900 rounded-[14px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-pink-500" />
-              </div>
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 shadow-sm transition-all">
+      {/* Top Announcement Bar */}
+      <div className="bg-emerald-600 text-white text-xs py-1.5 px-4 text-center font-medium flex items-center justify-center gap-2">
+        <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-300" />
+        <span>تطبيق <strong>اشري من دارك</strong> — جميع مستلزماتك اليومية من أفضل المتاجر المحلية بضغطة زر!</span>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="flex items-center justify-between gap-4">
+          
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-emerald-500/20 transform hover:scale-105 transition-transform">
+              <Store className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-xl font-black bg-gradient-to-r from-pink-500 via-purple-500 to-amber-500 bg-clip-text text-transparent font-sans tracking-tight">
-                انستغرامي
-              </span>
-              <span className="block text-[10px] text-stone-400 font-bold -mt-1">
-                تواصل بلحظات
-              </span>
+              <h1 className="text-xl font-extrabold tracking-tight text-stone-900 dark:text-white flex items-center gap-1.5">
+                اشري من دارك
+                <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  مباشر 🟢
+                </span>
+              </h1>
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 font-medium">تسوق واطلب من المتاجر المجاورة لبيتك</p>
             </div>
-          </button>
+          </div>
+
+          {/* Location Selector (Desktop & Tablet) */}
+          <div className="hidden md:flex items-center">
+            <button
+              onClick={() => setIsChangingAddress(true)}
+              className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 px-3.5 py-2 rounded-xl text-xs font-semibold border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+            >
+              <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <div className="text-right">
+                <span className="block text-[10px] text-stone-400 font-normal">عنوان التوصيل</span>
+                <span className="max-w-[150px] truncate block text-xs">{userAddress}</span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+            </button>
+          </div>
+
+          {/* Search Bar in Desktop */}
+          <div className="hidden lg:flex flex-1 max-w-md relative">
+            <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-stone-400">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              placeholder="ابحث عن اسم متجر، تصنيف، أو منتج..."
+              value={filterOptions.searchQuery}
+              onChange={(e) => setFilterOptions(prev => ({ ...prev, searchQuery: e.target.value }))}
+              className="w-full pl-9 pr-10 py-2 bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            />
+            {filterOptions.searchQuery && (
+              <button 
+                onClick={() => setFilterOptions(prev => ({ ...prev, searchQuery: '' }))}
+                className="absolute inset-y-0 left-0 pl-3 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex items-center gap-2">
+            
+            {/* Favorites Toggle */}
+            <button
+              onClick={onOpenFavorites}
+              className="relative p-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+              title="المتاجر المفضلة"
+            >
+              <Heart className={`w-5 h-5 ${favoritesCount > 0 ? 'fill-rose-500 text-rose-500' : ''}`} />
+              {favoritesCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {favoritesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Cart Button */}
+            <button
+              onClick={onOpenCart}
+              className="relative flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span className="hidden sm:inline">السلة</span>
+              {cartCount > 0 && (
+                <span className="bg-white text-emerald-700 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+
         </div>
 
-        {/* DESKTOP NAV TABS */}
-        <nav className="hidden md:flex items-center gap-1 bg-stone-100 dark:bg-stone-800/60 p-1.5 rounded-2xl border border-stone-200/60 dark:border-stone-700/40">
-          <button
-            onClick={() => {
-              setSelectedUserId(null);
-              setActiveTab('home');
-            }}
-            className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'home'
-                ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-sm'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-            }`}
-          >
-            <Compass className="w-4 h-4 text-pink-500" />
-            <span>الرئيسية</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'create'
-                ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-sm'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-            }`}
-          >
-            <PlusSquare className="w-4 h-4 text-purple-500" />
-            <span>إنشاء منشور</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'search'
-                ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-sm'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-            }`}
-          >
-            <Search className="w-4 h-4 text-amber-500" />
-            <span>البحث</span>
-          </button>
-
-          {currentUser && (
-            <button
-              onClick={() => {
-                setSelectedUserId(null);
-                setActiveTab('profile');
-              }}
-              className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'profile' && !selectedUserId
-                  ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-sm'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-              }`}
+        {/* Search Bar Mobile */}
+        <div className="mt-3 lg:hidden relative">
+          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-stone-400">
+            <Search className="w-4 h-4" />
+          </div>
+          <input
+            type="text"
+            placeholder="ابحث عن متجر، سوبرماركت، مخبز..."
+            value={filterOptions.searchQuery}
+            onChange={(e) => setFilterOptions(prev => ({ ...prev, searchQuery: e.target.value }))}
+            className="w-full pl-9 pr-10 py-2.5 bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+          />
+          {filterOptions.searchQuery && (
+            <button 
+              onClick={() => setFilterOptions(prev => ({ ...prev, searchQuery: '' }))}
+              className="absolute inset-y-0 left-0 pl-3 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
             >
-              <User className="w-4 h-4 text-emerald-500" />
-              <span>الملف الشخصي</span>
-            </button>
-          )}
-
-          {currentUser?.role === 'admin' && (
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-rose-500 text-white shadow-sm'
-                  : 'text-rose-500 hover:bg-rose-500/10'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span>لوحة الإدارة</span>
-            </button>
-          )}
-        </nav>
-
-        {/* RIGHT CONTROLS: THEME, NOTIFS, USER AUTH */}
-        <div className="flex items-center gap-2">
-          
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-2.5 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
-            title={darkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}
-          >
-            {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          {/* Notifications Dropdown */}
-          {currentUser && (
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className="p-2.5 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer relative"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-pink-500 ring-2 ring-white dark:ring-stone-900 animate-ping" />
-                )}
-              </button>
-
-              {showNotifMenu && (
-                <div className="absolute left-0 mt-2 w-80 bg-white dark:bg-stone-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-800 p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-stone-800 mb-3">
-                    <span className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-2">
-                      <Heart className="w-4 h-4 text-pink-500" />
-                      <span>الإشعارات</span>
-                    </span>
-                    <span className="text-xs text-stone-400 font-mono">{notifications.length}</span>
-                  </div>
-
-                  <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
-                    {notifications.length === 0 ? (
-                      <p className="text-center py-6 text-stone-400">لا توجد إشعارات حالياً</p>
-                    ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800/50 flex items-start gap-2.5"
-                        >
-                          <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 dark:bg-pink-950 dark:text-pink-300 flex items-center justify-center font-bold text-xs shrink-0">
-                            {n.senderUsername?.[0]?.toUpperCase() || 'U'}
-                          </div>
-                          <div className="flex-1 space-y-0.5">
-                            <p className="text-stone-800 dark:text-stone-200 font-medium">{n.text}</p>
-                            <span className="text-[10px] text-stone-400 block">
-                              {new Date(n.createdAt).toLocaleTimeString('ar-EG', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* USER / AUTH */}
-          {currentUser ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setSelectedUserId(null);
-                  setActiveTab('profile');
-                }}
-                className="flex items-center gap-2.5 pl-3 pr-2 py-1.5 rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"
-              >
-                <img
-                  src={currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`}
-                  alt={currentUser.username}
-                  className="w-7 h-7 rounded-full object-cover ring-2 ring-pink-500/50"
-                />
-                <span className="font-bold text-xs text-stone-800 dark:text-stone-200 hidden sm:inline">
-                  @{currentUser.username}
-                </span>
-              </button>
-
-              <button
-                onClick={signOut}
-                className="p-2.5 rounded-xl text-stone-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                title="تسجيل الخروج"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={onOpenAuth}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-xs shadow-md shadow-pink-500/20 flex items-center gap-2 transition-all cursor-pointer"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>تسجيل الدخول</span>
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
+
+      {/* Address Edit Modal */}
+      {isChangingAddress && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-stone-800 rounded-3xl max-w-sm w-full p-6 shadow-xl border border-stone-200 dark:border-stone-700 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+                تغيير عنوان التوصيل
+              </h3>
+              <button 
+                onClick={() => setIsChangingAddress(false)}
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddressSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">
+                  اسم الحي أو المنطقة
+                </label>
+                <input
+                  type="text"
+                  value={tempAddress}
+                  onChange={(e) => setTempAddress(e.target.value)}
+                  placeholder="مثال: المنزل - حي الروضة"
+                  className="w-full px-3.5 py-2.5 bg-stone-100 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingAddress(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+                >
+                  حفظ العنوان
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
-}
+};

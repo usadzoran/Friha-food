@@ -1,83 +1,62 @@
 {
   "entities": {
-    "users": {
-      "title": "User",
-      "description": "User profile data",
+    "Product": {
+      "title": "Product",
+      "description": "Store product available for purchase in Algerian Dinar (DZD)",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
-        "username": { "type": "string" },
-        "displayName": { "type": "string" },
-        "photoURL": { "type": "string" },
-        "bio": { "type": "string" },
-        "role": { "type": "string" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "name": { "type": "string", "description": "Product name" },
+        "description": { "type": "string", "description": "Short product description" },
+        "price": { "type": "number", "description": "Price in DZD" },
+        "image_url": { "type": "string", "description": "URL of the product image" },
+        "active": { "type": "boolean", "description": "Whether the product is currently visible to customers" },
+        "created_at": { "type": "string", "description": "ISO timestamp of creation" }
       },
-      "required": ["uid", "email", "username"]
+      "required": ["name", "price", "image_url", "active"]
     },
-    "posts": {
-      "title": "Post",
-      "description": "Social feed posts containing photo or video",
+    "Order": {
+      "title": "Order",
+      "description": "Customer order details",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "username": { "type": "string" },
-        "userPhotoURL": { "type": "string" },
-        "mediaUrl": { "type": "string" },
-        "mediaType": { "type": "string" },
-        "caption": { "type": "string" },
-        "likeCount": { "type": "number" },
-        "commentCount": { "type": "number" },
-        "createdAt": { "type": "string" }
+        "customer_name": { "type": "string", "description": "Full name of the customer" },
+        "customer_phone": { "type": "string", "description": "Phone number of the customer" },
+        "customer_address": { "type": "string", "description": "Detailed delivery address" },
+        "notes": { "type": "string", "description": "Optional customer notes" },
+        "total_price": { "type": "number", "description": "Total order amount in DZD" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "delivered", "cancelled"], "description": "Order lifecycle status" },
+        "created_at": { "type": "string", "description": "Creation ISO timestamp" },
+        "updated_at": { "type": "string", "description": "Last update ISO timestamp" }
       },
-      "required": ["id", "userId", "mediaUrl", "createdAt"]
+      "required": ["customer_name", "customer_phone", "customer_address", "total_price", "status"]
     },
-    "comments": {
-      "title": "Comment",
-      "description": "Comments on feed posts",
+    "OrderItem": {
+      "title": "OrderItem",
+      "description": "Individual line item attached to an order",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "postId": { "type": "string" },
-        "userId": { "type": "string" },
-        "username": { "type": "string" },
-        "userPhotoURL": { "type": "string" },
-        "text": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "order_id": { "type": "string", "description": "Reference ID to order document" },
+        "product_id": { "type": "string", "description": "Reference ID to product document" },
+        "product_name": { "type": "string", "description": "Snapshot of product name at order time" },
+        "quantity": { "type": "number", "description": "Quantity ordered" },
+        "price": { "type": "number", "description": "Snapshot price per unit in DZD at order time" },
+        "subtotal": { "type": "number", "description": "Quantity * price in DZD" }
       },
-      "required": ["id", "postId", "userId", "text", "createdAt"]
+      "required": ["order_id", "product_name", "quantity", "price", "subtotal"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Products collection"
     },
-    "likes": {
-      "title": "Like",
-      "description": "User likes on posts",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "postId": { "type": "string" },
-        "userId": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "postId", "userId"]
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders collection"
     },
-    "notifications": {
-      "title": "Notification",
-      "description": "User activity notifications",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "recipientId": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderUsername": { "type": "string" },
-        "type": { "type": "string" },
-        "postId": { "type": "string" },
-        "text": { "type": "string" },
-        "read": { "type": "boolean" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "recipientId", "senderId", "type", "createdAt"]
+    "/order_items/{orderItemId}": {
+      "schema": "OrderItem",
+      "description": "Order items collection"
     }
   }
 }

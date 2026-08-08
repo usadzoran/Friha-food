@@ -1,6 +1,6 @@
 {
-  "name": "انستغرامي",
-  "description": "تطبيق تواصل اجتماعي عصري لمشاركة الصور والفيديوهات والتفاعل في الوقت الحقيقي عبر Firebase",
+  "name": "اشري من دارك",
+  "description": "تطبيق اشري من دارك - منصة تسوق من أفضل المتاجر المحلية والمنزلية بكل سهولة",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

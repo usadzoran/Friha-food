@@ -1,56 +1,48 @@
-export interface UserProfile {
-  uid: string;
-  email: string;
-  username: string;
-  displayName?: string;
-  photoURL?: string;
-  bio?: string;
-  role: 'user' | 'admin';
-  status: 'active' | 'blocked';
-  createdAt: string;
-}
+export type OrderStatus = 'pending' | 'accepted' | 'delivered' | 'cancelled';
 
-export interface Post {
+export interface Product {
   id: string;
-  userId: string;
-  username: string;
-  userPhotoURL?: string;
-  mediaUrl: string;
-  mediaType: 'image' | 'video';
-  caption: string;
-  likeCount: number;
-  commentCount: number;
-  createdAt: string;
+  name: string;
+  description: string;
+  price: number; // in DZD
+  image_url: string;
+  active: boolean;
+  created_at?: string;
 }
 
-export interface Comment {
+export interface OrderItem {
+  id?: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price: number; // Unit price in DZD at time of purchase
+  subtotal: number; // quantity * price
+}
+
+export interface Order {
   id: string;
-  postId: string;
-  userId: string;
-  username: string;
-  userPhotoURL?: string;
-  text: string;
-  createdAt: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  notes?: string;
+  total_price: number; // in DZD
+  status: OrderStatus;
+  created_at: string;
+  updated_at?: string;
+  items?: OrderItem[]; // Populated joined items
 }
 
-export interface Like {
-  id: string;
-  postId: string;
-  userId: string;
-  createdAt: string;
+export interface CartItem {
+  product: Product;
+  quantity: number;
 }
 
-export interface Notification {
-  id: string;
-  recipientId: string;
-  senderId: string;
-  senderUsername: string;
-  senderPhotoURL?: string;
-  type: 'like' | 'comment' | 'follow';
-  postId?: string;
-  text: string;
-  read: boolean;
-  createdAt: string;
+export interface CustomerInfo {
+  name: string;
+  phone: string;
+  address: string;
+  notes: string;
 }
 
-export type ViewTab = 'home' | 'create' | 'search' | 'profile' | 'admin';
+export type AdminTab = 'dashboard' | 'products' | 'current_orders' | 'order_history';
