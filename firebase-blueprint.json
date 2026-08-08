@@ -56,6 +56,18 @@
         "subtotal": { "type": "number", "description": "Quantity * price in DZD" }
       },
       "required": ["order_id", "product_name", "quantity", "price", "subtotal"]
+    },
+    "Analytics": {
+      "title": "Analytics",
+      "description": "Visitor stats and page view counters",
+      "type": "object",
+      "properties": {
+        "total_visits": { "type": "number", "description": "Total visits count" },
+        "unique_visits": { "type": "number", "description": "Total unique session visitors" },
+        "today_visits": { "type": "number", "description": "Visits recorded today" },
+        "last_visit_date": { "type": "string", "description": "YYYY-MM-DD date string" },
+        "last_visit_at": { "type": "string", "description": "ISO timestamp of last visit" }
+      }
     }
   },
   "firestore": {
@@ -74,6 +86,10 @@
     "/order_items/{orderItemId}": {
       "schema": "OrderItem",
       "description": "Order items collection"
+    },
+    "/analytics/{analyticsId}": {
+      "schema": "Analytics",
+      "description": "Visitor tracking stats"
     }
   }
 }

@@ -54,4 +54,18 @@ export interface CustomerInfo {
   notes: string;
 }
 
-export type AdminTab = 'dashboard' | 'products' | 'categories' | 'current_orders' | 'order_history';
+export interface DailyVisit {
+  date: string;
+  visits: number;
+}
+
+export interface VisitorStats {
+  total_visits: number;
+  unique_visits: number;
+  today_visits: number;
+  last_visit_date?: string;
+  last_visit_at?: string;
+  daily_history?: DailyVisit[];
+}
+
+export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history';

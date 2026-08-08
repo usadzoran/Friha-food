@@ -9,10 +9,12 @@ import {
   orderBy, 
   where,
   getDocs,
+  getDoc,
+  setDoc,
   writeBatch
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem } from '../types';
+import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats } from '../types';
 
 const PRODUCTS_COLLECTION = 'products';
 const CATEGORIES_COLLECTION = 'categories';
@@ -340,3 +342,107 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     handleFirestoreError(error, OperationType.UPDATE, `${ORDERS_COLLECTION}/${orderId}`);
   }
 }
+
+// Analytics & Visitor Tracking
+const ANALYTICS_COLLECTION = 'analytics';
+const SITE_VISITORS_DOC = 'site_visitors';
+
+export async function trackSiteVisit(): Promise<void> {
+  try {
+    const docRef = doc(db, ANALYTICS_COLLECTION, SITE_VISITORS_DOC);
+    const snap = await getDoc(docRef);
+
+    const isNewSession = !sessionStorage.getItem('dz_visitor_session');
+    if (isNewSession) {
+      sessionStorage.setItem('dz_visitor_session', 'true');
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    if (!snap.exists()) {
+      const initialStats: VisitorStats = {
+        total_visits: 1,
+        unique_visits: 1,
+        today_visits: 1,
+        last_visit_date: todayStr,
+        last_visit_at: nowIso,
+        daily_history: [{ date: todayStr, visits: 1 }]
+      };
+      await setDoc(docRef, initialStats);
+      return;
+    }
+
+    const data = snap.data() as VisitorStats;
+    const currentTotal = data.total_visits || 0;
+    const currentUnique = data.unique_visits || 0;
+    const lastDate = data.last_visit_date || '';
+    
+    let newTodayVisits = data.today_visits || 0;
+    if (lastDate === todayStr) {
+      newTodayVisits += 1;
+    } else {
+      newTodayVisits = 1;
+    }
+
+    // Update daily history (keep last 14 days)
+    const history = data.daily_history || [];
+    const todayIndex = history.findIndex(item => item.date === todayStr);
+    let updatedHistory = [...history];
+
+    if (todayIndex >= 0) {
+      updatedHistory[todayIndex] = {
+        ...updatedHistory[todayIndex],
+        visits: updatedHistory[todayIndex].visits + 1
+      };
+    } else {
+      updatedHistory.push({ date: todayStr, visits: 1 });
+    }
+
+    if (updatedHistory.length > 14) {
+      updatedHistory = updatedHistory.slice(updatedHistory.length - 14);
+    }
+
+    const updates: Partial<VisitorStats> = {
+      total_visits: currentTotal + 1,
+      unique_visits: isNewSession ? currentUnique + 1 : currentUnique,
+      today_visits: newTodayVisits,
+      last_visit_date: todayStr,
+      last_visit_at: nowIso,
+      daily_history: updatedHistory
+    };
+
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    console.error('Error recording visitor stat:', error);
+  }
+}
+
+export function subscribeToVisitorStats(onUpdate: (stats: VisitorStats) => void) {
+  try {
+    const docRef = doc(db, ANALYTICS_COLLECTION, SITE_VISITORS_DOC);
+
+    return onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data() as VisitorStats);
+        } else {
+          onUpdate({
+            total_visits: 0,
+            unique_visits: 0,
+            today_visits: 0,
+            daily_history: []
+          });
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, `${ANALYTICS_COLLECTION}/${SITE_VISITORS_DOC}`);
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, `${ANALYTICS_COLLECTION}/${SITE_VISITORS_DOC}`);
+    return () => {};
+  }
+}
+

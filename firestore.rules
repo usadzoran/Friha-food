@@ -35,5 +35,10 @@ service cloud.firestore {
                     && request.resource.data.quantity is number;
       allow read, update, delete: if true;
     }
+
+    // Analytics / Visitors collection
+    match /analytics/{docId} {
+      allow read, write: if true;
+    }
   }
 }

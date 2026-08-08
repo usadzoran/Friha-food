@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Product, Order, OrderStatus, AdminTab, Category } from '../../types';
+import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats } from '../../types';
 import { 
   addProduct, 
   updateProduct, 
@@ -33,13 +33,21 @@ import {
   Link as LinkIcon,
   Sparkles,
   Tag,
-  FolderPlus
+  FolderPlus,
+  Users,
+  TrendingUp,
+  BarChart2,
+  Activity,
+  Calendar,
+  Globe,
+  MousePointerClick
 } from 'lucide-react';
 
 interface AdminDashboardProps {
   products: Product[];
   categories: Category[];
   orders: Order[];
+  visitorStats?: VisitorStats | null;
 }
 
 // Preset library of curated product images
@@ -61,7 +69,8 @@ const PRESET_IMAGES = [
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
   categories,
-  orders
+  orders,
+  visitorStats
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
@@ -306,6 +315,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('visitors')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                activeTab === 'visitors'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>زوار الموقع</span>
+              {visitorStats?.today_visits ? (
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                  {visitorStats.today_visits}
+                </span>
+              ) : null}
+            </button>
+
+            <button
               onClick={() => setActiveTab('products')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                 activeTab === 'products'
@@ -436,6 +462,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             </div>
 
+            {/* Visitor Counter Section Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-slate-700/60 relative overflow-hidden space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-white">قسم عدد زوار الموقع</h3>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>تتبع حي ومباشر</span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      متابعة آنية لعدد الزيارات والزوار الفريدين للمتجر
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('visitors')}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 self-start sm:self-auto"
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  <span>تفاصيل وسجل الزيارات</span>
+                </button>
+              </div>
+
+              {/* Visitor Quick Numbers Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>إجمالي الزيارات</span>
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-black text-white">
+                    {(visitorStats?.total_visits || 0).toLocaleString('ar-DZ')}
+                  </div>
+                  <p className="text-[10px] text-emerald-400/80 font-medium">مشاهدات الصفحة الكلية</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>زوار اليوم</span>
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-2xl font-black text-amber-300">
+                    {(visitorStats?.today_visits || 0).toLocaleString('ar-DZ')}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">زيارات اليوم الحالي</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>الزوار الفريدون</span>
+                    <Users className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <div className="text-2xl font-black text-blue-300">
+                    {(visitorStats?.unique_visits || 0).toLocaleString('ar-DZ')}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">جلسات مختلفة للمستخدمين</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>معدل تحويل الطلبات</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-black text-emerald-300">
+                    {visitorStats?.unique_visits && visitorStats.unique_visits > 0
+                      ? `${((deliveredOrders.length / visitorStats.unique_visits) * 100).toFixed(1)}%`
+                      : '0%'}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">من الزوار إلى طلبات ناجحة</p>
+                </div>
+              </div>
+            </div>
+
             {/* Quick Action Bar */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-4">
@@ -464,6 +570,158 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <FolderPlus className="w-4 h-4" />
                   <span>قسم جديد</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: VISITORS ANALYTICS */}
+        {activeTab === 'visitors' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white p-6 rounded-3xl shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <Users className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black text-white">إحصائيات وعدد زوار الموقع</h2>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>تحديث حي وتلقائي</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1">
+                    تابع تحركات وزيارات متجرك مباشرة لتفهم التفاعل والزيارات بالكامل
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/80 border border-slate-700/60 px-4 py-2.5 rounded-2xl text-xs text-slate-300 flex items-center gap-3 self-start md:self-auto">
+                <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <div>
+                  <div className="font-bold text-white">حالة التتبع: نشط</div>
+                  <div className="text-[10px] text-slate-400">آخر زيارة: {visitorStats?.last_visit_at ? new Date(visitorStats.last_visit_at).toLocaleTimeString('ar-DZ') : 'جديد'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-xs font-bold">إجمالي زيارات الموقع</span>
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-slate-900">
+                  {(visitorStats?.total_visits || 0).toLocaleString('ar-DZ')}
+                </div>
+                <p className="text-xs text-slate-500">إجمالي فتح الصفحات من كافّة الأجهزة</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-xs font-bold">زوار اليوم</span>
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-amber-600">
+                  {(visitorStats?.today_visits || 0).toLocaleString('ar-DZ')}
+                </div>
+                <p className="text-xs text-slate-500">عدد الزيارات المسجلة اليوم</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-xs font-bold">الزوار الفريدون</span>
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Users className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-emerald-600">
+                  {(visitorStats?.unique_visits || 0).toLocaleString('ar-DZ')}
+                </div>
+                <p className="text-xs text-slate-500">مستخدمين أو جلسات متصفح مختلفة</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-xs font-bold">معدل تحويل المبيعات</span>
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-purple-700">
+                  {visitorStats?.unique_visits && visitorStats.unique_visits > 0
+                    ? `${((deliveredOrders.length / visitorStats.unique_visits) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
+                <p className="text-xs text-slate-500">نسبة الشراء من إجمالي الزوار</p>
+              </div>
+            </div>
+
+            {/* Daily Traffic Breakdown */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                    <BarChart2 className="w-5 h-5 text-emerald-600" />
+                    <span>السجل اليومي لحركة الزوار (آخر 14 يومًا)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">تفاصيل عدد الزوار يوميًا وملاحظة نمو الحركة</p>
+                </div>
+                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                  {visitorStats?.daily_history?.length || 0} أيام مسجلة
+                </span>
+              </div>
+
+              {visitorStats?.daily_history && visitorStats.daily_history.length > 0 ? (
+                <div className="space-y-3">
+                  {visitorStats.daily_history.slice().reverse().map((day, idx) => {
+                    const maxVisits = Math.max(...(visitorStats.daily_history?.map(d => d.visits) || [1]));
+                    const percentage = Math.min(100, Math.round((day.visits / (maxVisits || 1)) * 100));
+
+                    return (
+                      <div key={idx} className="space-y-1 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-slate-700 font-mono">{day.date}</span>
+                          <span className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-lg">
+                            {day.visits} زيارة
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.max(5, percentage)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400 space-y-2">
+                  <Activity className="w-10 h-10 mx-auto text-slate-300" />
+                  <p className="text-sm font-bold">لا يوجد سجل تاريخي حتى الآن</p>
+                  <p className="text-xs text-slate-400">سيظهر السجل تلقائيًا عند تصفح زوار جدد للموقع</p>
+                </div>
+              )}
+            </div>
+
+            {/* Smart E-commerce Recommendations */}
+            <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-xs">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-black text-emerald-900 text-sm">نصائح لزيادة تحويل الزوار إلى طلبات مؤكدة</h4>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  تأكد من إضافة صور واضحة وجذابة للمنتجات، وكتابة وصف مفصّل بالدينار الجزائري، مع الإشارة إلى سرعة التوصيل والدفع عند الاستلام لزيادة ثقة الزائر.
+                </p>
               </div>
             </div>
           </div>

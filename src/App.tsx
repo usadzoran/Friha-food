@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Product, Category, Order, CartItem, CustomerInfo } from './types';
+import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats } from './types';
 import { 
   seedProductsIfEmpty, 
   seedCategoriesIfEmpty,
   subscribeToProducts, 
   subscribeToCategories,
   subscribeToOrders, 
-  createOrder 
+  createOrder,
+  trackSiteVisit,
+  subscribeToVisitorStats
 } from './services/storeService';
 
 import { Header } from './components/Header';
@@ -39,6 +41,7 @@ export default function App() {
   const [allProductsAdmin, setAllProductsAdmin] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -189,6 +192,14 @@ export default function App() {
       setOrders(orderList);
     });
 
+    // Track site visit
+    trackSiteVisit();
+
+    // Subscribe to site visitor statistics
+    const unsubscribeVisitorStats = subscribeToVisitorStats((stats) => {
+      setVisitorStats(stats);
+    });
+
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
@@ -196,6 +207,7 @@ export default function App() {
       unsubscribeAllProducts();
       unsubscribeCategories();
       unsubscribeOrders();
+      unsubscribeVisitorStats();
     };
   }, []);
 
@@ -346,6 +358,7 @@ export default function App() {
           products={allProductsAdmin}
           categories={categories}
           orders={orders}
+          visitorStats={visitorStats}
         />
       ) : (
         <main className="max-w-6xl mx-auto px-4 py-6 space-y-8 pb-20">
