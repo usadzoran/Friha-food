@@ -81,6 +81,52 @@ const INITIAL_ALGERIAN_PRODUCTS: Omit<Product, 'id'>[] = [
   }
 ];
 
+// Restore default initial categories and products if missing or requested
+export async function restoreDefaultData(): Promise<void> {
+  try {
+    // 1. Check or seed categories
+    let currentCats = await seedCategoriesIfEmpty();
+    if (currentCats.length === 0) {
+      for (const cat of INITIAL_CATEGORIES) {
+        const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
+          ...cat,
+          created_at: new Date().toISOString()
+        });
+        currentCats.push({ id: docRef.id, ...cat, created_at: new Date().toISOString() });
+      }
+    }
+
+    // 2. Check existing products
+    const prodSnap = await getDocs(collection(db, PRODUCTS_COLLECTION));
+    const existingNames = new Set(prodSnap.docs.map(d => d.data().name));
+
+    const batch = writeBatch(db);
+    let countAdded = 0;
+
+    INITIAL_ALGERIAN_PRODUCTS.forEach((prod, idx) => {
+      if (!existingNames.has(prod.name)) {
+        const catObj = currentCats.length > 0 ? currentCats[idx % currentCats.length] : null;
+        const ref = doc(collection(db, PRODUCTS_COLLECTION));
+        batch.set(ref, {
+          ...prod,
+          category_id: catObj ? catObj.id : '',
+          active: true,
+          created_at: new Date().toISOString()
+        });
+        countAdded++;
+      }
+    });
+
+    if (countAdded > 0) {
+      await batch.commit();
+      console.log(`Restored ${countAdded} default products to Firestore.`);
+    }
+  } catch (error) {
+    console.error('Error restoring default data:', error);
+    throw error;
+  }
+}
+
 // Seed initial categories if empty
 export async function seedCategoriesIfEmpty(): Promise<Category[]> {
   try {

@@ -8,7 +8,8 @@ import {
   updateOrderStatus,
   addCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  restoreDefaultData
 } from '../../services/storeService';
 import { 
   LayoutDashboard, 
@@ -40,7 +41,9 @@ import {
   Activity,
   Calendar,
   Globe,
-  MousePointerClick
+  MousePointerClick,
+  RotateCcw,
+  Database
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -73,6 +76,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   visitorStats
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
+
+  const handleRestoreDefaultData = async () => {
+    if (!window.confirm('هل تريد استرجاع وإعادة تحميل الأقسام والمنتجات الأساسية في قاعدة البيانات؟')) return;
+    try {
+      setIsRestoring(true);
+      setRestoreSuccessMsg(null);
+      await restoreDefaultData();
+      setRestoreSuccessMsg('تمت استعادة البيانات الأوليّة والمنتجات والأقسام بنجاح!');
+      setTimeout(() => setRestoreSuccessMsg(null), 5000);
+    } catch (err) {
+      alert('حدث خطأ أثناء استرجاع البيانات: ' + (err as Error).message);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   // Product Modal & Form State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -384,11 +404,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>سجل الطلبات ({historicOrders.length})</span>
             </button>
 
+            <button
+              onClick={handleRestoreDefaultData}
+              disabled={isRestoring}
+              title="استرجاع الأقسام والمنتجات الأصلية في حالة اختفائها"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 mr-auto disabled:opacity-50"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isRestoring ? 'animate-spin' : ''}`} />
+              <span>{isRestoring ? 'جاري الاسترجاع...' : 'استرجاع البيانات'}</span>
+            </button>
+
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+        {restoreSuccessMsg && (
+          <div className="bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-md font-bold text-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="w-5 h-5 text-emerald-200 shrink-0" />
+              <span>{restoreSuccessMsg}</span>
+            </div>
+            <button onClick={() => setRestoreSuccessMsg(null)} className="text-emerald-200 hover:text-white text-xs">✕</button>
+          </div>
+        )}
 
         {/* TAB 1: OVERVIEW DASHBOARD */}
         {activeTab === 'dashboard' && (

@@ -3,6 +3,7 @@ import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats } from '
 import { 
   seedProductsIfEmpty, 
   seedCategoriesIfEmpty,
+  restoreDefaultData,
   subscribeToProducts, 
   subscribeToCategories,
   subscribeToOrders, 
@@ -175,6 +176,9 @@ export default function App() {
     const unsubscribeProducts = subscribeToProducts((prodList) => {
       setProducts(prodList);
       setIsLoading(false);
+      if (prodList.length === 0) {
+        restoreDefaultData().catch(console.error);
+      }
     }, false);
 
     // Safety timeout to ensure skeleton loader finishes even if network is slow
@@ -190,6 +194,9 @@ export default function App() {
     // Subscribe to categories
     const unsubscribeCategories = subscribeToCategories((catList) => {
       setCategories(catList);
+      if (catList.length === 0) {
+        restoreDefaultData().catch(console.error);
+      }
     });
 
     // Subscribe to orders for admin
