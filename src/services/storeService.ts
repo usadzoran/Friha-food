@@ -81,17 +81,48 @@ const INITIAL_ALGERIAN_PRODUCTS: Omit<Product, 'id'>[] = [
   }
 ];
 
+// Seed initial categories if empty
+export async function seedCategoriesIfEmpty(): Promise<Category[]> {
+  try {
+    const snap = await getDocs(collection(db, CATEGORIES_COLLECTION));
+    if (snap.empty) {
+      console.log('Seeding initial categories into Firestore...');
+      const createdCats: Category[] = [];
+      for (const cat of INITIAL_CATEGORIES) {
+        const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
+          ...cat,
+          created_at: new Date().toISOString()
+        });
+        createdCats.push({ id: docRef.id, ...cat, created_at: new Date().toISOString() });
+      }
+      return createdCats;
+    } else {
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+    }
+  } catch (error) {
+    console.error('Error seeding categories:', error);
+    return [];
+  }
+}
+
 // Seed initial products if db is empty
 export async function seedProductsIfEmpty(): Promise<void> {
   try {
+    const currentCats = await seedCategoriesIfEmpty();
     const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
     if (snap.empty) {
       console.log('Seeding initial products into Firestore...');
       const batch = writeBatch(db);
-      for (const prod of INITIAL_ALGERIAN_PRODUCTS) {
+      INITIAL_ALGERIAN_PRODUCTS.forEach((prod, idx) => {
+        const catObj = currentCats.length > 0 ? currentCats[idx % currentCats.length] : null;
         const ref = doc(collection(db, PRODUCTS_COLLECTION));
-        batch.set(ref, prod);
-      }
+        batch.set(ref, {
+          ...prod,
+          category_id: catObj ? catObj.id : '',
+          active: true,
+          created_at: new Date().toISOString()
+        });
+      });
       await batch.commit();
     }
   } catch (error) {
@@ -106,20 +137,35 @@ export function subscribeToProducts(
 ) {
   try {
     const colRef = collection(db, PRODUCTS_COLLECTION);
-    const q = includeInactive 
-      ? query(colRef, orderBy('created_at', 'desc'))
-      : query(colRef, where('active', '==', true));
 
     return onSnapshot(
-      q,
+      colRef,
       (snapshot) => {
-        const products: Product[] = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Product));
+        let products: Product[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            ...data,
+            // Ensure active is true unless explicitly false
+            active: data.active !== false
+          } as Product;
+        });
+
+        if (!includeInactive) {
+          products = products.filter(p => p.active !== false);
+        }
+
+        // Sort in memory safely by created_at desc
+        products.sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tB - tA;
+        });
+
         onUpdate(products);
       },
       (error) => {
+        console.error('Error in subscribeToProducts:', error);
         handleFirestoreError(error, OperationType.GET, PRODUCTS_COLLECTION);
       }
     );
@@ -129,40 +175,30 @@ export function subscribeToProducts(
   }
 }
 
-// Seed initial categories if empty
-export async function seedCategoriesIfEmpty(): Promise<void> {
-  try {
-    const snap = await getDocs(collection(db, CATEGORIES_COLLECTION));
-    if (snap.empty) {
-      console.log('Seeding initial categories into Firestore...');
-      const batch = writeBatch(db);
-      for (const cat of INITIAL_CATEGORIES) {
-        const ref = doc(collection(db, CATEGORIES_COLLECTION));
-        batch.set(ref, cat);
-      }
-      await batch.commit();
-    }
-  } catch (error) {
-    console.error('Error seeding categories:', error);
-  }
-}
-
 // Subscribe to Categories in real-time
 export function subscribeToCategories(onUpdate: (categories: Category[]) => void) {
   try {
     const colRef = collection(db, CATEGORIES_COLLECTION);
-    const q = query(colRef, orderBy('created_at', 'asc'));
 
     return onSnapshot(
-      q,
+      colRef,
       (snapshot) => {
         const categories: Category[] = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         } as Category));
+
+        // Sort in memory safely by created_at asc
+        categories.sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tA - tB;
+        });
+
         onUpdate(categories);
       },
       (error) => {
+        console.error('Error in subscribeToCategories:', error);
         handleFirestoreError(error, OperationType.GET, CATEGORIES_COLLECTION);
       }
     );
@@ -295,15 +331,20 @@ export async function createOrder(
 export function subscribeToOrders(onUpdate: (orders: Order[]) => void) {
   try {
     const ordersRef = collection(db, ORDERS_COLLECTION);
-    const q = query(ordersRef, orderBy('created_at', 'desc'));
 
     return onSnapshot(
-      q,
+      ordersRef,
       async (snapshot) => {
         const ordersList: Order[] = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         } as Order));
+
+        ordersList.sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tB - tA;
+        });
 
         // Fetch order items for each order
         try {
