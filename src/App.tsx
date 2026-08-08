@@ -25,7 +25,11 @@ import {
   Search, 
   ShoppingBag, 
   Sparkles,
-  PhoneCall
+  ArrowRight,
+  ArrowLeft,
+  Grid,
+  Package,
+  Layers
 } from 'lucide-react';
 
 export default function App() {
@@ -168,15 +172,39 @@ export default function App() {
     }
   };
 
-  // Filtered product catalog for customers
-  const filteredProducts = products.filter((p) => {
-    const term = searchQuery.toLowerCase().trim();
-    const matchesSearch = 
-      p.name.toLowerCase().includes(term) ||
-      (p.description && p.description.toLowerCase().includes(term));
-    const matchesCategory = selectedCategory === 'all' || p.category_id === selectedCategory;
-    return matchesSearch && matchesCategory;
+  // Currently selected category object
+  const currentCategoryObj = categories.find((c) => c.id === selectedCategory);
+
+  // Filtered product catalog for current category
+  const categoryProducts = products.filter((p) => {
+    if (selectedCategory === 'all') return true;
+    return p.category_id === selectedCategory;
   });
+
+  // Filtered products if searching globally
+  const searchedProducts = products.filter((p) => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return false;
+    return (
+      p.name.toLowerCase().includes(term) ||
+      (p.description && p.description.toLowerCase().includes(term))
+    );
+  });
+
+  // Filtered categories if searching in main view
+  const filteredCategories = categories.filter((cat) => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return true;
+    return cat.name.toLowerCase().includes(term);
+  });
+
+  // Fallback cover image for category
+  const getCategoryCover = (cat: Category): string => {
+    if (cat.image_url) return cat.image_url;
+    const matchProd = products.find((p) => p.category_id === cat.id);
+    if (matchProd?.image_url) return matchProd.image_url;
+    return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80';
+  };
 
   const cartTotalCount = cartItems.reduce((a, b) => a + b.quantity, 0);
 
@@ -248,109 +276,281 @@ export default function App() {
             <div className="absolute left-[-5%] bottom-[-20%] w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
           </div>
 
-          {/* Search bar & Products Header */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div>
-                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                  <span>المنتجات المتوفرة للطلب</span>
-                  <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                    {filteredProducts.length} منتج
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500">اختر المنتج الذي ترغب فيه واضغط على أضف إلى الطلب</p>
-              </div>
+          {/* VIEW MODE 1: SEARCH ACTIVE ACROSS PRODUCTS */}
+          {searchQuery.trim().length > 0 ? (
+            <div className="space-y-4 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
+                    <span>نتائج البحث عن:</span>
+                    <span className="text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                      "{searchQuery}"
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    تم العثور على {searchedProducts.length} منتج
+                  </p>
+                </div>
 
-              {/* Search input */}
-              <div className="relative w-full sm:w-72">
-                <input
-                  type="text"
-                  placeholder="ابحث عن منتج..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50"
-                />
-                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-              </div>
-            </div>
-
-            {/* Category Chips Bar */}
-            {categories.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                <button
-                  onClick={() => setSelectedCategory('all')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 border ${
-                    selectedCategory === 'all'
-                      ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  الجميع ({products.length})
-                </button>
-
-                {categories.map((cat) => {
-                  const catCount = products.filter(p => p.category_id === cat.id).length;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 border flex items-center gap-1.5 ${
-                        selectedCategory === cat.id
-                          ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span>{cat.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                        selectedCategory === cat.id
-                          ? 'bg-emerald-800 text-emerald-100'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {catCount}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Product Catalog Grid */}
-            {isLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 py-8">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse space-y-3">
-                    <div className="aspect-4/3 bg-slate-200 rounded-xl"></div>
-                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                  >
+                    إلغاء البحث والعودة
+                  </button>
+                  <div className="relative w-full sm:w-60">
+                    <input
+                      type="text"
+                      placeholder="ابحث عن منتج..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                    />
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
                   </div>
-                ))}
+                </div>
               </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
-                <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
-                <h4 className="font-bold text-slate-800 text-base">لا توجد منتجات مطابقة لمفتاح البحث</h4>
-                <p className="text-xs text-slate-500">جرب كتابة كلمة أخرى أو تصفح القائمة الكاملة.</p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition-colors"
-                >
-                  إعادة عرض جميع المنتجات
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
-                {filteredProducts.map((prod) => (
-                  <ProductCard
-                    key={prod.id}
-                    product={prod}
-                    onSelect={(p) => setSelectedProduct(p)}
-                    onAddToCart={(p) => handleAddToCart(p, 1)}
-                    isAdded={addedItemIds.has(prod.id)}
+
+              {searchedProducts.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
+                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-base">لا توجد منتجات مطابقة لـ "{searchQuery}"</h4>
+                  <p className="text-xs text-slate-500">تأكد من كتابة اسم المنتج بشكل صحيح أو اختر قسماً من الأقسام.</p>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition-colors"
+                  >
+                    عرض الأقسام الرئيسية
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  {searchedProducts.map((prod) => (
+                    <ProductCard
+                      key={prod.id}
+                      product={prod}
+                      onSelect={(p) => setSelectedProduct(p)}
+                      onAddToCart={(p) => handleAddToCart(p, 1)}
+                      isAdded={addedItemIds.has(prod.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : selectedCategory === 'all' ? (
+            
+            /* VIEW MODE 2: HOME PAGE - CATEGORIES GRID (أقسام المتجر) */
+            <div className="space-y-6 animate-in fade-in">
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <Grid className="w-5 h-5 text-emerald-600" />
+                    <span>أقسام المتجر المتوفرة</span>
+                    <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                      {categories.length} أقسام
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">اختر القسم الذي تريد تصفحه لمشاهدة المنتجات المتوفرة</p>
+                </div>
+
+                {/* Search input */}
+                <div className="relative w-full sm:w-72">
+                  <input
+                    type="text"
+                    placeholder="ابحث عن منتج أو قسم..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-medium"
                   />
-                ))}
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Categories Grid Display */}
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="bg-white rounded-3xl p-4 border border-slate-200 animate-pulse space-y-3">
+                      <div className="aspect-16/10 bg-slate-200 rounded-2xl"></div>
+                      <div className="h-5 bg-slate-200 rounded w-1/2"></div>
+                      <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredCategories.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
+                  <Layers className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-base">لا توجد أقسام متوفرة حالياً</h4>
+                  <p className="text-xs text-slate-500">يرجى إضافة أقسام من لوحة التحكم لتظهر للزبائن هنا.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredCategories.map((cat) => {
+                    const prodCount = products.filter((p) => p.category_id === cat.id).length;
+                    const coverImg = getCategoryCover(cat);
+
+                    return (
+                      <div
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className="group relative bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
+                      >
+                        {/* Cover Image & Gradient Overlay */}
+                        <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-100">
+                          <img
+                            src={coverImg}
+                            alt={cat.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/25 to-transparent" />
+
+                          {/* Product Count Badge */}
+                          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-black text-slate-800 shadow-xs border border-white/40 flex items-center gap-1">
+                            <Package className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{prodCount} منتج متوفر</span>
+                          </div>
+
+                          {/* Category Title */}
+                          <div className="absolute bottom-3 right-3 left-3 text-white">
+                            <h3 className="text-lg sm:text-xl font-black drop-shadow-xs line-clamp-1">
+                              {cat.name}
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Card Footer Bar */}
+                        <div className="p-3.5 bg-white flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-emerald-700 transition-colors border-t border-slate-100">
+                          <span className="flex items-center gap-1.5 text-emerald-700 font-extrabold">
+                            <span>تصفح المنتجات</span>
+                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                          </span>
+                          <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                            اضغط للعرض
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+
+            /* VIEW MODE 3: SPECIFIC CATEGORY PRODUCTS PAGE (عرض منتجات القسم) */
+            <div className="space-y-6 animate-in fade-in">
+              {/* Category Breadcrumb Header */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-all border border-slate-200"
+                  >
+                    <ArrowRight className="w-4 h-4 text-emerald-700" />
+                    <span>العودة لجميع الأقسام</span>
+                  </button>
+
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="ابحث داخل هذا القسم..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                    />
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                  </div>
+                </div>
+
+                {/* Selected Category Banner Info */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                  <div className="flex items-center gap-3">
+                    {currentCategoryObj?.image_url && (
+                      <img
+                        src={currentCategoryObj.image_url}
+                        alt={currentCategoryObj.name}
+                        className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0 shadow-2xs"
+                      />
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                          قسم {currentCategoryObj?.name || 'مخصص'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500">
+                          ({categoryProducts.length} منتج)
+                        </span>
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                        {currentCategoryObj?.name}
+                      </h2>
+                    </div>
+                  </div>
+
+                  {/* Horizontal Category Switcher Chips */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 no-scrollbar">
+                    <button
+                      onClick={() => setSelectedCategory('all')}
+                      className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap"
+                    >
+                      الأقسام
+                    </button>
+                    {categories.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setSelectedCategory(c.id)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                          selectedCategory === c.id
+                            ? 'bg-emerald-700 text-white shadow-2xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Products in selected category */}
+              {isLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 py-8">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse space-y-3">
+                      <div className="aspect-4/3 bg-slate-200 rounded-xl"></div>
+                      <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                      <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : categoryProducts.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
+                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-base">لا توجد منتجات في قسم "{currentCategoryObj?.name}" حالياً</h4>
+                  <p className="text-xs text-slate-500">يمكنك العودة إلى الأقسام الرئيسية لتصفح بقية الأقسام المتوفرة.</p>
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition-colors"
+                  >
+                    تصفح باقي الأقسام
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  {categoryProducts.map((prod) => (
+                    <ProductCard
+                      key={prod.id}
+                      product={prod}
+                      onSelect={(p) => setSelectedProduct(p)}
+                      onAddToCart={(p) => handleAddToCart(p, 1)}
+                      isAdded={addedItemIds.has(prod.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Public Pending Orders Section */}
           <PendingOrdersPublicSection orders={orders} />

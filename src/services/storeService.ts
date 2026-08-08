@@ -20,11 +20,11 @@ const ORDERS_COLLECTION = 'orders';
 const ORDER_ITEMS_COLLECTION = 'order_items';
 
 const INITIAL_CATEGORIES: Omit<Category, 'id'>[] = [
-  { name: 'المأكولات والتمور', icon: 'Utensils', created_at: new Date().toISOString() },
-  { name: 'الزيوت والعسل', icon: 'Droplets', created_at: new Date().toISOString() },
-  { name: 'المشروبات والقهوة', icon: 'Coffee', created_at: new Date().toISOString() },
-  { name: 'الأدوات والتقليديات', icon: 'Package', created_at: new Date().toISOString() },
-  { name: 'الحلويات والمخبوزات', icon: 'Cake', created_at: new Date().toISOString() }
+  { name: 'المأكولات والتمور', icon: 'Utensils', image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() },
+  { name: 'الزيوت والعسل', icon: 'Droplets', image_url: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() },
+  { name: 'المشروبات والقهوة', icon: 'Coffee', image_url: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() },
+  { name: 'الأدوات والتقليديات', icon: 'Package', image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() },
+  { name: 'الحلويات والمخبوزات', icon: 'Cake', image_url: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() }
 ];
 
 // Initial Algerian sample items for initial auto-seeding if database is empty

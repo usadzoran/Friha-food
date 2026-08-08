@@ -21,6 +21,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "Category name" },
+        "image_url": { "type": "string", "description": "Category cover image URL" },
         "icon": { "type": "string", "description": "Optional icon or symbol name" },
         "created_at": { "type": "string", "description": "ISO creation date" }
       },

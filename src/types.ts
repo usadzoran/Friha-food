@@ -3,6 +3,7 @@ export type OrderStatus = 'pending' | 'accepted' | 'delivered' | 'cancelled';
 export interface Category {
   id: string;
   name: string;
+  image_url?: string;
   icon?: string;
   created_at?: string;
 }

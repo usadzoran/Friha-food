@@ -81,9 +81,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Category Modal & Form State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [catImageMode, setCatImageMode] = useState<'preset' | 'url' | 'upload'>('preset');
   const [catForm, setCatForm] = useState({
     name: '',
-    icon: 'Folder'
+    icon: 'Folder',
+    image_url: ''
   });
 
   // Filter state for product tab
@@ -180,29 +182,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Category handlers
   const handleOpenAddCategory = () => {
     setEditingCategory(null);
-    setCatForm({ name: '', icon: 'Folder' });
+    setCatForm({ name: '', icon: 'Folder', image_url: PRESET_IMAGES[0].url });
+    setCatImageMode('preset');
     setIsCategoryModalOpen(true);
   };
 
   const handleOpenEditCategory = (cat: Category) => {
     setEditingCategory(cat);
-    setCatForm({ name: cat.name, icon: cat.icon || 'Folder' });
+    setCatForm({ name: cat.name, icon: cat.icon || 'Folder', image_url: cat.image_url || PRESET_IMAGES[0].url });
+    setCatImageMode('url');
     setIsCategoryModalOpen(true);
+  };
+
+  const handleCategoryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً. يرجى اختيار صورة أقل من 2 ميغابايت.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setCatForm((prev) => ({ ...prev, image_url: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!catForm.name.trim()) return;
 
+    const finalImage = catForm.image_url.trim() || PRESET_IMAGES[0].url;
+
     if (editingCategory) {
       await updateCategory(editingCategory.id, {
         name: catForm.name.trim(),
-        icon: catForm.icon
+        icon: catForm.icon,
+        image_url: finalImage
       });
     } else {
       await addCategory({
         name: catForm.name.trim(),
-        icon: catForm.icon
+        icon: catForm.icon,
+        image_url: finalImage
       });
     }
     setIsCategoryModalOpen(false);
@@ -613,15 +638,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   return (
                     <div
                       key={cat.id}
-                      className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between"
+                      className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between overflow-hidden"
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                            <Tag className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-slate-800 text-sm">{cat.name}</h3>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {cat.image_url ? (
+                            <img src={cat.image_url} alt={cat.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                              <Tag className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-800 text-sm truncate">{cat.name}</h3>
                             <span className="text-[11px] text-slate-500 font-medium">
                               يحتوي على {categoryProducts.length} منتج
                             </span>
@@ -1143,18 +1172,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ADD / EDIT CATEGORY MODAL */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
             <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
               <h3 className="font-bold text-base flex items-center gap-2">
                 <FolderPlus className="w-5 h-5 text-emerald-400" />
-                <span>{editingCategory ? 'تعديل اسم القسم' : 'إنشاء قسم جديد'}</span>
+                <span>{editingCategory ? 'تعديل القسم وصورته' : 'إنشاء قسم جديد'}</span>
               </h3>
               <button onClick={() => setIsCategoryModalOpen(false)} className="p-1 hover:bg-slate-800 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCategory} className="p-5 space-y-4">
+            <form onSubmit={handleSaveCategory} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">اسم القسم / التصنيف</label>
                 <input
@@ -1165,6 +1194,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="مثال: تمور وتمور جافة..."
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 font-bold"
                 />
+              </div>
+
+              {/* Category Image Options */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">صورة الغلاف للقسم</label>
+                <div className="flex rounded-xl bg-slate-100 p-1 mb-3 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setCatImageMode('preset')}
+                    className={`flex-1 py-1.5 rounded-lg transition-all ${catImageMode === 'preset' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600'}`}
+                  >
+                    صور جاهزة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCatImageMode('upload')}
+                    className={`flex-1 py-1.5 rounded-lg transition-all ${catImageMode === 'upload' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600'}`}
+                  >
+                    رفع صورة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCatImageMode('url')}
+                    className={`flex-1 py-1.5 rounded-lg transition-all ${catImageMode === 'url' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600'}`}
+                  >
+                    رابط مباشر
+                  </button>
+                </div>
+
+                {catImageMode === 'preset' && (
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-xl">
+                    {PRESET_IMAGES.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCatForm({ ...catForm, image_url: preset.url })}
+                        className={`group relative rounded-lg overflow-hidden border-2 transition-all aspect-square ${
+                          catForm.image_url === preset.url ? 'border-emerald-600 ring-2 ring-emerald-500/20' : 'border-transparent opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {catImageMode === 'upload' && (
+                  <div className="p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCategoryFileUpload}
+                      className="hidden"
+                      id="catImageFileInput"
+                    />
+                    <label htmlFor="catImageFileInput" className="cursor-pointer space-y-1 block">
+                      <Upload className="w-6 h-6 text-emerald-600 mx-auto" />
+                      <span className="text-xs font-bold text-slate-700 block">اختر صورة من جهازك</span>
+                    </label>
+                  </div>
+                )}
+
+                {catImageMode === 'url' && (
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={catForm.image_url}
+                    onChange={(e) => setCatForm({ ...catForm, image_url: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                  />
+                )}
+
+                {/* Preview Thumbnail */}
+                {catForm.image_url && (
+                  <div className="mt-3 flex items-center gap-3 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    <img src={catForm.image_url} alt="معاينة" className="w-12 h-12 object-cover rounded-lg border border-slate-300" />
+                    <span className="text-xs font-bold text-slate-700">معاينة غلاف القسم</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
