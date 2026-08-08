@@ -1,11 +1,19 @@
 export type OrderStatus = 'pending' | 'accepted' | 'delivered' | 'cancelled';
 
+export interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+  created_at?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
   description: string;
   price: number; // in DZD
   image_url: string;
+  category_id?: string;
   active: boolean;
   created_at?: string;
 }
@@ -45,4 +53,4 @@ export interface CustomerInfo {
   notes: string;
 }
 
-export type AdminTab = 'dashboard' | 'products' | 'current_orders' | 'order_history';
+export type AdminTab = 'dashboard' | 'products' | 'categories' | 'current_orders' | 'order_history';

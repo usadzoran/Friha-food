@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Product, Order, CartItem, CustomerInfo } from './types';
+import { Product, Category, Order, CartItem, CustomerInfo } from './types';
 import { 
   seedProductsIfEmpty, 
+  seedCategoriesIfEmpty,
   subscribeToProducts, 
+  subscribeToCategories,
   subscribeToOrders, 
   createOrder 
 } from './services/storeService';
@@ -31,8 +33,10 @@ export default function App() {
   // Real-time Firestore state
   const [products, setProducts] = useState<Product[]>([]);
   const [allProductsAdmin, setAllProductsAdmin] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Cart & Modals state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -52,8 +56,9 @@ export default function App() {
 
   // 1. Initialize DB and Real-time listeners & secret shortcuts
   useEffect(() => {
-    // Seed initial products if db is empty
+    // Seed initial products and categories if db is empty
     seedProductsIfEmpty();
+    seedCategoriesIfEmpty();
 
     // Check if ?admin or #admin is in URL
     if (window.location.search.includes('admin') || window.location.hash.includes('admin')) {
@@ -84,6 +89,11 @@ export default function App() {
       setAllProductsAdmin(prodList);
     }, true);
 
+    // Subscribe to categories
+    const unsubscribeCategories = subscribeToCategories((catList) => {
+      setCategories(catList);
+    });
+
     // Subscribe to orders for admin
     const unsubscribeOrders = subscribeToOrders((orderList) => {
       setOrders(orderList);
@@ -93,6 +103,7 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       unsubscribeProducts();
       unsubscribeAllProducts();
+      unsubscribeCategories();
       unsubscribeOrders();
     };
   }, [isAdminLoggedIn]);
@@ -160,10 +171,11 @@ export default function App() {
   // Filtered product catalog for customers
   const filteredProducts = products.filter((p) => {
     const term = searchQuery.toLowerCase().trim();
-    return (
+    const matchesSearch = 
       p.name.toLowerCase().includes(term) ||
-      (p.description && p.description.toLowerCase().includes(term))
-    );
+      (p.description && p.description.toLowerCase().includes(term));
+    const matchesCategory = selectedCategory === 'all' || p.category_id === selectedCategory;
+    return matchesSearch && matchesCategory;
   });
 
   const cartTotalCount = cartItems.reduce((a, b) => a + b.quantity, 0);
@@ -193,6 +205,7 @@ export default function App() {
       {isAdminLoggedIn && activeView === 'admin' ? (
         <AdminDashboard
           products={allProductsAdmin}
+          categories={categories}
           orders={orders}
         />
       ) : (
@@ -260,6 +273,46 @@ export default function App() {
                 <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
               </div>
             </div>
+
+            {/* Category Chips Bar */}
+            {categories.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 border ${
+                    selectedCategory === 'all'
+                      ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  الجميع ({products.length})
+                </button>
+
+                {categories.map((cat) => {
+                  const catCount = products.filter(p => p.category_id === cat.id).length;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 border flex items-center gap-1.5 ${
+                        selectedCategory === cat.id
+                          ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{cat.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                        selectedCategory === cat.id
+                          ? 'bg-emerald-800 text-emerald-100'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {catCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Product Catalog Grid */}
             {isLoading ? (

@@ -13,6 +13,12 @@ service cloud.firestore {
       allow create, update, delete: if true;
     }
 
+    // Categories collection
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
     // Orders collection: public can create, anyone can read/update for store lifecycle
     match /orders/{orderId} {
       allow create: if request.resource.data.customer_name is string

@@ -9,10 +9,22 @@
         "description": { "type": "string", "description": "Short product description" },
         "price": { "type": "number", "description": "Price in DZD" },
         "image_url": { "type": "string", "description": "URL of the product image" },
+        "category_id": { "type": "string", "description": "Optional category ID or section name" },
         "active": { "type": "boolean", "description": "Whether the product is currently visible to customers" },
         "created_at": { "type": "string", "description": "ISO timestamp of creation" }
       },
       "required": ["name", "price", "image_url", "active"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Store category or section for products",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Category name" },
+        "icon": { "type": "string", "description": "Optional icon or symbol name" },
+        "created_at": { "type": "string", "description": "ISO creation date" }
+      },
+      "required": ["name"]
     },
     "Order": {
       "title": "Order",
@@ -49,6 +61,10 @@
     "/products/{productId}": {
       "schema": "Product",
       "description": "Products collection"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Categories collection"
     },
     "/orders/{orderId}": {
       "schema": "Order",

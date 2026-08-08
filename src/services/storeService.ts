@@ -12,11 +12,20 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem } from '../types';
+import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem } from '../types';
 
 const PRODUCTS_COLLECTION = 'products';
+const CATEGORIES_COLLECTION = 'categories';
 const ORDERS_COLLECTION = 'orders';
 const ORDER_ITEMS_COLLECTION = 'order_items';
+
+const INITIAL_CATEGORIES: Omit<Category, 'id'>[] = [
+  { name: 'المأكولات والتمور', icon: 'Utensils', created_at: new Date().toISOString() },
+  { name: 'الزيوت والعسل', icon: 'Droplets', created_at: new Date().toISOString() },
+  { name: 'المشروبات والقهوة', icon: 'Coffee', created_at: new Date().toISOString() },
+  { name: 'الأدوات والتقليديات', icon: 'Package', created_at: new Date().toISOString() },
+  { name: 'الحلويات والمخبوزات', icon: 'Cake', created_at: new Date().toISOString() }
+];
 
 // Initial Algerian sample items for initial auto-seeding if database is empty
 const INITIAL_ALGERIAN_PRODUCTS: Omit<Product, 'id'>[] = [
@@ -115,6 +124,83 @@ export function subscribeToProducts(
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, PRODUCTS_COLLECTION);
     return () => {};
+  }
+}
+
+// Seed initial categories if empty
+export async function seedCategoriesIfEmpty(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, CATEGORIES_COLLECTION));
+    if (snap.empty) {
+      console.log('Seeding initial categories into Firestore...');
+      const batch = writeBatch(db);
+      for (const cat of INITIAL_CATEGORIES) {
+        const ref = doc(collection(db, CATEGORIES_COLLECTION));
+        batch.set(ref, cat);
+      }
+      await batch.commit();
+    }
+  } catch (error) {
+    console.error('Error seeding categories:', error);
+  }
+}
+
+// Subscribe to Categories in real-time
+export function subscribeToCategories(onUpdate: (categories: Category[]) => void) {
+  try {
+    const colRef = collection(db, CATEGORIES_COLLECTION);
+    const q = query(colRef, orderBy('created_at', 'asc'));
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const categories: Category[] = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        } as Category));
+        onUpdate(categories);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, CATEGORIES_COLLECTION);
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, CATEGORIES_COLLECTION);
+    return () => {};
+  }
+}
+
+// Add Category (Admin)
+export async function addCategory(category: Omit<Category, 'id'>): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
+      ...category,
+      created_at: new Date().toISOString()
+    });
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, CATEGORIES_COLLECTION);
+    throw error;
+  }
+}
+
+// Update Category (Admin)
+export async function updateCategory(id: string, updates: Partial<Category>): Promise<void> {
+  try {
+    const docRef = doc(db, CATEGORIES_COLLECTION, id);
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${CATEGORIES_COLLECTION}/${id}`);
+  }
+}
+
+// Delete Category (Admin)
+export async function deleteCategory(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, CATEGORIES_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${CATEGORIES_COLLECTION}/${id}`);
   }
 }
 
