@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingBag, ShieldCheck, Store } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingBag, Store } from 'lucide-react';
 
 interface HeaderProps {
   cartCount: number;
@@ -16,12 +16,30 @@ export const Header: React.FC<HeaderProps> = ({
   isAdmin,
   onLogoutAdmin
 }) => {
+  const [clickCount, setClickCount] = useState<number>(0);
+
+  // Secret triple click on logo to open admin modal
+  const handleLogoClick = () => {
+    if (isAdmin) return;
+    const newCount = clickCount + 1;
+    if (newCount >= 3) {
+      onOpenAdmin();
+      setClickCount(0);
+    } else {
+      setClickCount(newCount);
+      setTimeout(() => setClickCount(0), 1200);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-emerald-700 text-white shadow-md border-b border-emerald-800">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-2.5">
+        {/* Brand / Logo (Triple-click opens admin login quietly) */}
+        <div 
+          onClick={handleLogoClick}
+          className="flex items-center gap-2.5 cursor-pointer select-none"
+        >
           <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
             <Store className="w-6 h-6 text-emerald-200" />
           </div>
@@ -37,21 +55,12 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {isAdmin ? (
+          {isAdmin && (
             <button
               onClick={onLogoutAdmin}
               className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-emerald-100 text-xs sm:text-sm font-medium transition-colors border border-emerald-600"
             >
               الخروج من الادمن
-            </button>
-          ) : (
-            <button
-              onClick={onOpenAdmin}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800/60 hover:bg-emerald-800 text-emerald-100 text-xs sm:text-sm font-medium transition-colors border border-emerald-600/50"
-              title="لوحة تحكم مدير المتجر"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-300" />
-              <span className="hidden sm:inline">لوحة التحكم</span>
             </button>
           )}
 

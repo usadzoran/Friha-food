@@ -14,6 +14,7 @@ import { CartModal } from './components/CartModal';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSection';
 
 import { 
   Truck, 
@@ -49,10 +50,28 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [addedItemIds, setAddedItemIds] = useState<Set<string>>(new Set());
 
-  // 1. Initialize DB and Real-time listeners
+  // 1. Initialize DB and Real-time listeners & secret shortcuts
   useEffect(() => {
     // Seed initial products if db is empty
     seedProductsIfEmpty();
+
+    // Check if ?admin or #admin is in URL
+    if (window.location.search.includes('admin') || window.location.hash.includes('admin')) {
+      setIsAdminModalOpen(true);
+    }
+
+    // Secret Keyboard shortcut: Ctrl + Shift + A or Alt + Shift + A
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.altKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        if (isAdminLoggedIn) {
+          setActiveView((prev) => (prev === 'admin' ? 'store' : 'admin'));
+        } else {
+          setIsAdminModalOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
 
     // Subscribe to active products for customers
     const unsubscribeProducts = subscribeToProducts((prodList) => {
@@ -71,11 +90,12 @@ export default function App() {
     });
 
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       unsubscribeProducts();
       unsubscribeAllProducts();
       unsubscribeOrders();
     };
-  }, []);
+  }, [isAdminLoggedIn]);
 
   // Cart helper functions
   const handleAddToCart = (product: Product, quantity = 1) => {
@@ -279,6 +299,9 @@ export default function App() {
             )}
           </div>
 
+          {/* Public Pending Orders Section */}
+          <PendingOrdersPublicSection orders={orders} />
+
           {/* Floating Cart Quick Bar for Mobile */}
           {cartTotalCount > 0 && (
             <div className="fixed bottom-4 left-4 right-4 z-40 sm:hidden">
@@ -314,20 +337,16 @@ export default function App() {
           <p className="text-slate-500">
             جميع الحقوق محفوظة © {new Date().getFullYear()} - التوصيل والدفع عند الاستلام.
           </p>
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                if (isAdminLoggedIn) {
-                  setActiveView(activeView === 'admin' ? 'store' : 'admin');
-                } else {
-                  setIsAdminModalOpen(true);
-                }
-              }}
-              className="text-[11px] text-slate-500 hover:text-emerald-400 underline transition-colors"
-            >
-              {isAdminLoggedIn ? 'الانتقال إلى لوحة التحكم' : 'دخول مدير المتجر (الادمن)'}
-            </button>
-          </div>
+          {isAdminLoggedIn && (
+            <div className="pt-2">
+              <button
+                onClick={() => setActiveView(activeView === 'admin' ? 'store' : 'admin')}
+                className="text-[11px] text-emerald-400 hover:text-emerald-300 underline transition-colors"
+              >
+                {activeView === 'admin' ? 'العودة للمتجر' : 'الانتقال إلى لوحة التحكم'}
+              </button>
+            </div>
+          )}
         </div>
       </footer>
 
