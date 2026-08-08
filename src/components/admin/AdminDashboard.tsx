@@ -78,6 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const handleRestoreDefaultData = async () => {
     if (!window.confirm('هل تريد استرجاع وإعادة تحميل الأقسام والمنتجات الأساسية في قاعدة البيانات؟')) return;
@@ -194,6 +195,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         image_url: finalImage,
         active: prodForm.active
       });
+      setSuccessNotice('تم تعديل المنتج والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
     } else {
       await addProduct({
         name: prodForm.name.trim(),
@@ -201,10 +203,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         description: prodForm.description.trim(),
         price: priceNum,
         image_url: finalImage,
-        active: prodForm.active
+        active: prodForm.active !== false
       });
+      setSuccessNotice('تم إضافة المنتج الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
     }
 
+    setTimeout(() => setSuccessNotice(null), 5000);
     setIsProductModalOpen(false);
   };
 
@@ -252,13 +256,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         icon: catForm.icon,
         image_url: finalImage
       });
+      setSuccessNotice('تم تعديل القسم والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
     } else {
       await addCategory({
         name: catForm.name.trim(),
         icon: catForm.icon,
         image_url: finalImage
       });
+      setSuccessNotice('تم إضافة القسم الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
     }
+
+    setTimeout(() => setSuccessNotice(null), 5000);
     setIsCategoryModalOpen(false);
   };
 
@@ -427,6 +435,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>{restoreSuccessMsg}</span>
             </div>
             <button onClick={() => setRestoreSuccessMsg(null)} className="text-emerald-200 hover:text-white text-xs">✕</button>
+          </div>
+        )}
+
+        {successNotice && (
+          <div className="bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-md font-bold text-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="w-5 h-5 text-emerald-200 shrink-0" />
+              <span>{successNotice}</span>
+            </div>
+            <button onClick={() => setSuccessNotice(null)} className="text-emerald-200 hover:text-white text-xs">✕</button>
           </div>
         )}
 
