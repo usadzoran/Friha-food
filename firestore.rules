@@ -40,5 +40,10 @@ service cloud.firestore {
     match /analytics/{docId} {
       allow read, write: if true;
     }
+
+    // Test connection collection
+    match /test/{docId} {
+      allow read, write: if true;
+    }
   }
 }

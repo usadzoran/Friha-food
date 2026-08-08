@@ -177,6 +177,11 @@ export default function App() {
       setIsLoading(false);
     }, false);
 
+    // Safety timeout to ensure skeleton loader finishes even if network is slow
+    const loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+
     // Subscribe to ALL products (including inactive) for admin
     const unsubscribeAllProducts = subscribeToProducts((prodList) => {
       setAllProductsAdmin(prodList);
@@ -201,6 +206,7 @@ export default function App() {
     });
 
     return () => {
+      clearTimeout(loadingTimeout);
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
       unsubscribeProducts();
