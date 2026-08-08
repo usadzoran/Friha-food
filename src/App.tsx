@@ -58,23 +58,109 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [addedItemIds, setAddedItemIds] = useState<Set<string>>(new Set());
 
-  // 1. Initialize DB and Real-time listeners & secret shortcuts
+  // Navigation & Routing helpers
+  const navigateToCategory = (catId: string) => {
+    if (catId === 'all') {
+      if (window.location.pathname !== '/') {
+        window.history.pushState(null, '', '/');
+      }
+      setSelectedCategory('all');
+      setActiveView('store');
+    } else {
+      const newPath = `/category/${encodeURIComponent(catId)}`;
+      if (window.location.pathname !== newPath) {
+        window.history.pushState(null, '', newPath);
+      }
+      setSelectedCategory(catId);
+      setActiveView('store');
+    }
+  };
+
+  const navigateToAdmin = () => {
+    if (window.location.pathname !== '/admin') {
+      window.history.pushState(null, '', '/admin');
+    }
+    setActiveView('admin');
+  };
+
+  const navigateToHome = () => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState(null, '', '/');
+    }
+    setSelectedCategory('all');
+    setActiveView('store');
+  };
+
+  const syncRouteFromUrl = () => {
+    const pathname = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+
+    const savedAdminAuth =
+      sessionStorage.getItem('admin_logged_in') === 'true' ||
+      localStorage.getItem('admin_logged_in') === 'true';
+
+    if (savedAdminAuth) {
+      setIsAdminLoggedIn(true);
+    }
+
+    if (pathname.startsWith('/admin') || search.includes('admin') || hash.includes('admin')) {
+      setActiveView('admin');
+      if (!savedAdminAuth) {
+        setIsAdminModalOpen(true);
+      }
+    } else if (pathname.startsWith('/category/')) {
+      const rawCatId = pathname.replace('/category/', '').split('/')[0];
+      const catId = decodeURIComponent(rawCatId);
+      if (catId) {
+        setSelectedCategory(catId);
+        setActiveView('store');
+      } else {
+        setSelectedCategory('all');
+        setActiveView('store');
+      }
+    } else {
+      const urlParams = new URLSearchParams(search);
+      const catQuery = urlParams.get('category');
+      if (catQuery) {
+        setSelectedCategory(catQuery);
+      } else {
+        setSelectedCategory('all');
+      }
+      setActiveView('store');
+    }
+  };
+
+  // 1. Initialize DB and Real-time listeners & route state
   useEffect(() => {
     // Seed initial products and categories if db is empty
     seedProductsIfEmpty();
     seedCategoriesIfEmpty();
 
-    // Check if ?admin or #admin is in URL
-    if (window.location.search.includes('admin') || window.location.hash.includes('admin')) {
-      setIsAdminModalOpen(true);
-    }
+    // Initial route sync
+    syncRouteFromUrl();
+
+    // Listen to back / forward browser navigation
+    const handlePopState = () => {
+      syncRouteFromUrl();
+    };
+    window.addEventListener('popstate', handlePopState);
 
     // Secret Keyboard shortcut: Ctrl + Shift + A or Alt + Shift + A
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.altKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
-        if (isAdminLoggedIn) {
-          setActiveView((prev) => (prev === 'admin' ? 'store' : 'admin'));
+        const savedAdminAuth =
+          sessionStorage.getItem('admin_logged_in') === 'true' ||
+          localStorage.getItem('admin_logged_in') === 'true';
+
+        if (isAdminLoggedIn || savedAdminAuth) {
+          setIsAdminLoggedIn(true);
+          if (activeView === 'admin') {
+            navigateToHome();
+          } else {
+            navigateToAdmin();
+          }
         } else {
           setIsAdminModalOpen(true);
         }
@@ -104,13 +190,36 @@ export default function App() {
     });
 
     return () => {
+      window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
       unsubscribeProducts();
       unsubscribeAllProducts();
       unsubscribeCategories();
       unsubscribeOrders();
     };
-  }, [isAdminLoggedIn]);
+  }, []);
+
+  // Admin Auth Handlers
+  const handleAdminLoginSuccess = () => {
+    setIsAdminLoggedIn(true);
+    sessionStorage.setItem('admin_logged_in', 'true');
+    localStorage.setItem('admin_logged_in', 'true');
+    navigateToAdmin();
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminLoggedIn(false);
+    sessionStorage.removeItem('admin_logged_in');
+    localStorage.removeItem('admin_logged_in');
+    navigateToHome();
+  };
+
+  const handleCloseAdminModal = () => {
+    setIsAdminModalOpen(false);
+    if (!isAdminLoggedIn && window.location.pathname.startsWith('/admin')) {
+      navigateToHome();
+    }
+  };
 
   // Cart helper functions
   const handleAddToCart = (product: Product, quantity = 1) => {
@@ -215,18 +324,20 @@ export default function App() {
       <Header
         cartCount={cartTotalCount}
         onOpenCart={() => setIsCartOpen(true)}
+        onGoHome={navigateToHome}
         onOpenAdmin={() => {
           if (isAdminLoggedIn) {
-            setActiveView(activeView === 'admin' ? 'store' : 'admin');
+            if (activeView === 'admin') {
+              navigateToHome();
+            } else {
+              navigateToAdmin();
+            }
           } else {
             setIsAdminModalOpen(true);
           }
         }}
         isAdmin={isAdminLoggedIn && activeView === 'admin'}
-        onLogoutAdmin={() => {
-          setIsAdminLoggedIn(false);
-          setActiveView('store');
-        }}
+        onLogoutAdmin={handleAdminLogout}
       />
 
       {/* Main Content View Switcher */}
@@ -318,7 +429,10 @@ export default function App() {
                   <h4 className="font-bold text-slate-800 text-base">لا توجد منتجات مطابقة لـ "{searchQuery}"</h4>
                   <p className="text-xs text-slate-500">تأكد من كتابة اسم المنتج بشكل صحيح أو اختر قسماً من الأقسام.</p>
                   <button
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => {
+                      setSearchQuery('');
+                      navigateToCategory('all');
+                    }}
                     className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition-colors"
                   >
                     عرض الأقسام الرئيسية
@@ -394,7 +508,7 @@ export default function App() {
                     return (
                       <div
                         key={cat.id}
-                        onClick={() => setSelectedCategory(cat.id)}
+                        onClick={() => navigateToCategory(cat.id)}
                         className="group relative bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99]"
                       >
                         {/* Cover Image & Gradient Overlay */}
@@ -444,7 +558,7 @@ export default function App() {
               <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <button
-                    onClick={() => setSelectedCategory('all')}
+                    onClick={() => navigateToCategory('all')}
                     className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-all border border-slate-200"
                   >
                     <ArrowRight className="w-4 h-4 text-emerald-700" />
@@ -491,7 +605,7 @@ export default function App() {
                   {/* Horizontal Category Switcher Chips */}
                   <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 no-scrollbar">
                     <button
-                      onClick={() => setSelectedCategory('all')}
+                      onClick={() => navigateToCategory('all')}
                       className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap"
                     >
                       الأقسام
@@ -499,7 +613,7 @@ export default function App() {
                     {categories.map((c) => (
                       <button
                         key={c.id}
-                        onClick={() => setSelectedCategory(c.id)}
+                        onClick={() => navigateToCategory(c.id)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                           selectedCategory === c.id
                             ? 'bg-emerald-700 text-white shadow-2xs'
@@ -530,7 +644,7 @@ export default function App() {
                   <h4 className="font-bold text-slate-800 text-base">لا توجد منتجات في قسم "{currentCategoryObj?.name}" حالياً</h4>
                   <p className="text-xs text-slate-500">يمكنك العودة إلى الأقسام الرئيسية لتصفح بقية الأقسام المتوفرة.</p>
                   <button
-                    onClick={() => setSelectedCategory('all')}
+                    onClick={() => navigateToCategory('all')}
                     className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition-colors"
                   >
                     تصفح باقي الأقسام
@@ -593,7 +707,13 @@ export default function App() {
           {isAdminLoggedIn && (
             <div className="pt-2">
               <button
-                onClick={() => setActiveView(activeView === 'admin' ? 'store' : 'admin')}
+                onClick={() => {
+                  if (activeView === 'admin') {
+                    navigateToHome();
+                  } else {
+                    navigateToAdmin();
+                  }
+                }}
                 className="text-[11px] text-emerald-400 hover:text-emerald-300 underline transition-colors"
               >
                 {activeView === 'admin' ? 'العودة للمتجر' : 'الانتقال إلى لوحة التحكم'}
@@ -627,11 +747,8 @@ export default function App() {
 
       <AdminLoginModal
         isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
-        onLoginSuccess={() => {
-          setIsAdminLoggedIn(true);
-          setActiveView('admin');
-        }}
+        onClose={handleCloseAdminModal}
+        onLoginSuccess={handleAdminLoginSuccess}
       />
 
     </div>

@@ -7,6 +7,7 @@ interface HeaderProps {
   onOpenAdmin: () => void;
   isAdmin: boolean;
   onLogoutAdmin: () => void;
+  onGoHome?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,12 +15,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCart,
   onOpenAdmin,
   isAdmin,
-  onLogoutAdmin
+  onLogoutAdmin,
+  onGoHome
 }) => {
   const [clickCount, setClickCount] = useState<number>(0);
 
-  // Secret triple click on logo to open admin modal
+  // Single click goes home, secret triple click on logo opens admin modal
   const handleLogoClick = () => {
+    if (onGoHome) onGoHome();
     if (isAdmin) return;
     const newCount = clickCount + 1;
     if (newCount >= 3) {
