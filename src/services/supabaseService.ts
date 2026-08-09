@@ -19,19 +19,32 @@ export async function getCategoriesSupabase(): Promise<Category[]> {
 export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Category | null> {
   if (!supabase) return null;
   const newId = 'cat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-  const payload = {
+  const payload: any = {
     id: newId,
     name: cat.name,
     icon: cat.icon || 'Folder',
     image_url: cat.image_url || '',
+    whatsapp_number: cat.whatsapp_number || '',
     created_at: cat.created_at || new Date().toISOString()
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('categories')
     .insert([payload])
     .select()
     .single();
+
+  if (error && (error.code === 'PGRST204' || error.message.includes('whatsapp_number'))) {
+    console.warn('Column whatsapp_number missing in Supabase, falling back without it.');
+    delete payload.whatsapp_number;
+    const fallbackRes = await supabase
+      .from('categories')
+      .insert([payload])
+      .select()
+      .single();
+    data = fallbackRes.data;
+    error = fallbackRes.error;
+  }
 
   if (error) {
     console.error('Supabase error adding category:', error);
@@ -42,10 +55,21 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
 
 export async function updateCategorySupabase(id: string, updates: Partial<Category>): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase
+  const payload: any = { ...updates };
+  let { error } = await supabase
     .from('categories')
-    .update(updates)
+    .update(payload)
     .eq('id', id);
+
+  if (error && (error.code === 'PGRST204' || error.message.includes('whatsapp_number'))) {
+    console.warn('Column whatsapp_number missing in Supabase, falling back without it.');
+    delete payload.whatsapp_number;
+    const fallbackRes = await supabase
+      .from('categories')
+      .update(payload)
+      .eq('id', id);
+    error = fallbackRes.error;
+  }
 
   if (error) {
     console.error('Supabase error updating category:', error);

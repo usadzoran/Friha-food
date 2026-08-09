@@ -5,6 +5,7 @@ export interface Category {
   name: string;
   image_url?: string;
   icon?: string;
+  whatsapp_number?: string;
   created_at?: string;
 }
 

@@ -44,7 +44,13 @@ import {
   MousePointerClick,
   RotateCcw,
   Database,
-  Loader2
+  Loader2,
+  MessageSquare,
+  MessageCircle,
+  Send,
+  Check,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -167,8 +173,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [catForm, setCatForm] = useState({
     name: '',
     icon: 'Folder',
-    image_url: ''
+    image_url: '',
+    whatsapp_number: ''
   });
+
+  // WhatsApp Department Dispatch Modal State
+  const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false);
+  const [selectedOrderForWhatsapp, setSelectedOrderForWhatsapp] = useState<Order | null>(null);
+  const [selectedCatIdForWhatsapp, setSelectedCatIdForWhatsapp] = useState<string>('');
+  const [whatsappModalNotice, setWhatsappModalNotice] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
+  const [sentLogMap, setSentLogMap] = useState<Record<string, { deptName: string; sentAt: string }[]>>({});
 
   // Filter state for product tab
   const [productSearch, setProductSearch] = useState('');
@@ -275,14 +289,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Category handlers
   const handleOpenAddCategory = () => {
     setEditingCategory(null);
-    setCatForm({ name: '', icon: 'Folder', image_url: PRESET_IMAGES[0].url });
+    setCatForm({ name: '', icon: 'Folder', image_url: PRESET_IMAGES[0].url, whatsapp_number: '' });
     setCatImageMode('preset');
     setIsCategoryModalOpen(true);
   };
 
   const handleOpenEditCategory = (cat: Category) => {
     setEditingCategory(cat);
-    setCatForm({ name: cat.name, icon: cat.icon || 'Folder', image_url: cat.image_url || PRESET_IMAGES[0].url });
+    setCatForm({
+      name: cat.name,
+      icon: cat.icon || 'Folder',
+      image_url: cat.image_url || PRESET_IMAGES[0].url,
+      whatsapp_number: cat.whatsapp_number || ''
+    });
     setCatImageMode('url');
     setIsCategoryModalOpen(true);
   };
@@ -316,14 +335,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         await updateCategory(editingCategory.id, {
           name: catForm.name.trim(),
           icon: catForm.icon,
-          image_url: finalImage
+          image_url: finalImage,
+          whatsapp_number: catForm.whatsapp_number.trim()
         });
         setSuccessNotice('تم تعديل القسم والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
       } else {
         await addCategory({
           name: catForm.name.trim(),
           icon: catForm.icon,
-          image_url: finalImage
+          image_url: finalImage,
+          whatsapp_number: catForm.whatsapp_number.trim()
         });
         setSuccessNotice('تم إضافة القسم الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
       }
@@ -342,6 +363,96 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (window.confirm(`هل أنت تأكد من حذف قسم "${name}"؟`)) {
       await deleteCategory(id);
     }
+  };
+
+  // WhatsApp Dispatch Handlers
+  const handleOpenWhatsappModal = (order: Order) => {
+    setSelectedOrderForWhatsapp(order);
+    setWhatsappModalNotice(null);
+    if (categories.length > 0) {
+      setSelectedCatIdForWhatsapp(categories[0].id);
+    } else {
+      setSelectedCatIdForWhatsapp('');
+    }
+    setIsWhatsappModalOpen(true);
+  };
+
+  const handleSendOrderToDepartmentWhatsapp = () => {
+    if (!selectedOrderForWhatsapp || !selectedCatIdForWhatsapp) return;
+
+    const selectedCategory = categories.find(c => c.id === selectedCatIdForWhatsapp);
+    if (!selectedCategory) {
+      setWhatsappModalNotice({ type: 'error', message: 'يرجى اختيار قسم صحيح.' });
+      return;
+    }
+
+    const rawPhone = (selectedCategory.whatsapp_number || '').trim();
+    if (!rawPhone) {
+      setWhatsappModalNotice({
+        type: 'error',
+        message: `قسم "${selectedCategory.name}" ليس لديه رقم WhatsApp مسجل! يرجى إضافة الرقم أولاً من تبويب "الأقسام".`
+      });
+      return;
+    }
+
+    // Filter order items that belong to the selected category
+    const orderItems = selectedOrderForWhatsapp.items || [];
+    const deptItems = orderItems.filter(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod ? prod.category_id === selectedCategory.id : false;
+    });
+
+    if (deptItems.length === 0) {
+      setWhatsappModalNotice({
+        type: 'error',
+        message: `الطلب DZ-${selectedOrderForWhatsapp.id.slice(-6).toUpperCase()} لا يحتوي على أي منتجات تابعة لقسم "${selectedCategory.name}".`
+      });
+      return;
+    }
+
+    // Format clean phone number
+    let cleanPhone = rawPhone.replace(/[^\d]/g, '');
+    if (cleanPhone.startsWith('0') && cleanPhone.length === 10) {
+      cleanPhone = '213' + cleanPhone.substring(1);
+    }
+
+    const deptTotal = deptItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const displayNum = `DZ-${selectedOrderForWhatsapp.id.slice(-6).toUpperCase()}`;
+
+    // Format Arabic structured WhatsApp message
+    const itemsText = deptItems.map((item, idx) => 
+      `  ${idx + 1}. *${item.product_name}*\n     الكمية: ${item.quantity}\n     السعر: ${item.price.toLocaleString('ar-DZ')} د.ج\n     المجموع: ${item.subtotal.toLocaleString('ar-DZ')} د.ج`
+    ).join('\n\n');
+
+    const message = 
+      `🛍️ *طلب مخصص لقسم (${selectedCategory.name})*\n` +
+      `رقم الطلب: *#${displayNum}*\n` +
+      `التاريخ: ${new Date(selectedOrderForWhatsapp.created_at).toLocaleString('ar-DZ')}\n\n` +
+      `👤 *معلومات الزبون:*\n` +
+      `• الاسم: ${selectedOrderForWhatsapp.customer_name}\n` +
+      `• الهاتف: ${selectedOrderForWhatsapp.customer_phone}\n` +
+      `• العنوان: ${selectedOrderForWhatsapp.customer_address}\n` +
+      (selectedOrderForWhatsapp.notes ? `• الملاحظات: ${selectedOrderForWhatsapp.notes}\n` : '') +
+      `\n📦 *المنتجات المطلوبة من قسم (${selectedCategory.name}):*\n\n` +
+      `${itemsText}\n\n` +
+      `-----------------------------------\n` +
+      `💰 *إجمالي حساب هذا القسم:* *${deptTotal.toLocaleString('ar-DZ')} DZD*`;
+
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+
+    // Record local dispatch log
+    const orderId = selectedOrderForWhatsapp.id;
+    const nowTime = new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
+    setSentLogMap(prev => ({
+      ...prev,
+      [orderId]: [...(prev[orderId] || []), { deptName: selectedCategory.name, sentAt: nowTime }]
+    }));
+
+    setWhatsappModalNotice({
+      type: 'success',
+      message: `تم فتح تطبيق WhatsApp لإرسال طلب قسم "${selectedCategory.name}" إلى الرقم (${cleanPhone}) بنجاح!`
+    });
   };
 
   // Toggle active product
@@ -1035,9 +1146,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           )}
                           <div className="min-w-0">
                             <h3 className="font-bold text-slate-800 text-sm truncate">{cat.name}</h3>
-                            <span className="text-[11px] text-slate-500 font-medium">
+                            <span className="text-[11px] text-slate-500 font-medium block">
                               يحتوي على {categoryProducts.length} منتج
                             </span>
+                            {cat.whatsapp_number ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 mt-1" dir="ltr">
+                                <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                {cat.whatsapp_number}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 mt-1">
+                                <AlertCircle className="w-3 h-3 text-amber-600" />
+                                بدون رقم WhatsApp
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -1205,33 +1327,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
 
                       {/* Action buttons */}
-                      <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                        {order.status === 'pending' && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        {/* WhatsApp Dispatch Button */}
+                        <button
+                          onClick={() => handleOpenWhatsappModal(order)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl transition-all shadow-2xs hover:shadow-xs"
+                          title="إرسال تفاصيل هذا الطلب إلى قسم معين عبر WhatsApp"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>📱 إرسال عبر WhatsApp</span>
+                        </button>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {order.status === 'pending' && (
+                            <button
+                              onClick={() => handleUpdateStatus(order.id, 'accepted')}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>قبول الطلب والتوصيل</span>
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => handleUpdateStatus(order.id, 'accepted')}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+                            onClick={() => handleUpdateStatus(order.id, 'delivered')}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
                           >
-                            <Truck className="w-3.5 h-3.5" />
-                            <span>قبول الطلب والتوصيل</span>
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>تم التسليم بنجاح</span>
                           </button>
-                        )}
 
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'delivered')}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span>تم التسليم بنجاح</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'cancelled')}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-slate-200 hover:border-red-200 transition-colors"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>إلغاء الطلب</span>
-                        </button>
+                          <button
+                            onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-slate-200 hover:border-red-200 transition-colors"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>إلغاء الطلب</span>
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Dispatch Logs if sent to departments */}
+                      {sentLogMap[order.id] && sentLogMap[order.id].length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-[11px]">
+                          <span className="font-bold text-emerald-800 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            تم الإرسال عبر الواتساب إلى:
+                          </span>
+                          {sentLogMap[order.id].map((log, idx) => (
+                            <span key={idx} className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
+                              قسم {log.deptName} ({log.sentAt})
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                     </div>
                   );
@@ -1593,6 +1742,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
+              {/* Department WhatsApp Number */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>رقم WhatsApp الخاص بالقسم</span>
+                  <span className="text-[10px] text-emerald-600 font-normal">اختیاري</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="مثال: 213550000000"
+                    value={catForm.whatsapp_number}
+                    onChange={(e) => setCatForm({ ...catForm, whatsapp_number: e.target.value })}
+                    className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                    dir="ltr"
+                  />
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 leading-normal">
+                  أدخل الرقم بالصيغة الدولية بدون (+) أو مسافات، مثال للجزائر: <strong className="text-slate-600 font-mono" dir="ltr">213550000000</strong>
+                </p>
+              </div>
+
               {/* Category Image Options */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">صورة الغلاف للقسم</label>
@@ -1701,6 +1872,205 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* WHATSAPP DEPARTMENT DISPATCH MODAL */}
+      {isWhatsappModalOpen && selectedOrderForWhatsapp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-100 my-8">
+            {/* Modal Header */}
+            <div className="p-4 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-emerald-300" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base">إرسال الطلب عبر WhatsApp</h3>
+                  <p className="text-[11px] text-emerald-100 font-medium">
+                    الطلب #{`DZ-${selectedOrderForWhatsapp.id.slice(-6).toUpperCase()}`} • {selectedOrderForWhatsapp.customer_name}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsWhatsappModalOpen(false)} 
+                className="p-1.5 hover:bg-white/10 rounded-xl transition-colors text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
+              
+              {/* Notice Banner if any */}
+              {whatsappModalNotice && (
+                <div className={`p-3.5 rounded-xl border flex items-start gap-2.5 ${
+                  whatsappModalNotice.type === 'error' 
+                    ? 'bg-red-50 border-red-200 text-red-800' 
+                    : whatsappModalNotice.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-blue-50 border-blue-200 text-blue-800'
+                }`}>
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="font-bold leading-relaxed flex-1">
+                    {whatsappModalNotice.message}
+                  </div>
+                </div>
+              )}
+
+              {/* Department Selection */}
+              <div className="space-y-2">
+                <label className="block font-bold text-slate-800 text-xs">
+                  اختر القسم المراد تحويل الطلب إليه:
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  سيتم تصفية المنتجات وإرسال قائمة بالمنتجات التابعة للقسم المختار فقط مع بيانات التواصل الخاصة بالزبون.
+                </p>
+
+                {categories.length === 0 ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-center font-bold">
+                    لا توجد أقسام معرفة في المتجر بعد.
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {categories.map((cat) => {
+                      const deptItems = (selectedOrderForWhatsapp.items || []).filter(item => {
+                        const prod = products.find(p => p.id === item.product_id);
+                        return prod ? prod.category_id === cat.id : false;
+                      });
+                      const isSelected = selectedCatIdForWhatsapp === cat.id;
+                      const hasPhone = Boolean((cat.whatsapp_number || '').trim());
+
+                      return (
+                        <div
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCatIdForWhatsapp(cat.id);
+                            setWhatsappModalNotice(null);
+                          }}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected 
+                              ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20 shadow-xs' 
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="radio"
+                              name="whatsapp_cat_select"
+                              checked={isSelected}
+                              onChange={() => {
+                                setSelectedCatIdForWhatsapp(cat.id);
+                                setWhatsappModalNotice(null);
+                              }}
+                              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            {cat.image_url ? (
+                              <img src={cat.image_url} alt={cat.name} className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold shrink-0">
+                                <Tag className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-900 text-xs">{cat.name}</div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                {hasPhone ? (
+                                  <span className="text-emerald-700 font-mono font-bold" dir="ltr">
+                                    📱 {cat.whatsapp_number}
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-600 font-medium">
+                                    ⚠️ لا يوجد رقم واتساب
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-left shrink-0">
+                            {deptItems.length > 0 ? (
+                              <span className="bg-emerald-100 text-emerald-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-emerald-200">
+                                {deptItems.length} منتجات في الطلب
+                              </span>
+                            ) : (
+                              <span className="bg-slate-100 text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                لا توجد منتجات
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Department Order Items Preview */}
+              {selectedCatIdForWhatsapp && (() => {
+                const selectedCategory = categories.find(c => c.id === selectedCatIdForWhatsapp);
+                if (!selectedCategory) return null;
+
+                const deptItems = (selectedOrderForWhatsapp.items || []).filter(item => {
+                  const prod = products.find(p => p.id === item.product_id);
+                  return prod ? prod.category_id === selectedCategory.id : false;
+                });
+                const deptTotal = deptItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+                return (
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                      <span className="font-bold text-slate-800">
+                        معاينة المنتجات لقسم ({selectedCategory.name}):
+                      </span>
+                      <span className="font-black text-emerald-800 text-xs">
+                        {deptTotal.toLocaleString('ar-DZ')} د.ج
+                      </span>
+                    </div>
+
+                    {deptItems.length === 0 ? (
+                      <p className="text-slate-400 italic text-center py-2">
+                        لا توجد منتجات تابعة لهذا القسم في هذا الطلب
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                        {deptItems.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-slate-700 text-xs bg-white p-2 rounded-lg border border-slate-100">
+                            <span className="font-medium">
+                              {item.product_name} × <strong className="text-emerald-700">{item.quantity}</strong>
+                            </span>
+                            <span className="font-bold text-slate-900">
+                              {item.subtotal.toLocaleString('ar-DZ')} د.ج
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Action Footer Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWhatsappModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendOrderToDepartmentWhatsapp}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>📱 إرسال عبر WhatsApp الآن</span>
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
       )}

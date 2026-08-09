@@ -9,8 +9,12 @@ CREATE TABLE IF NOT EXISTS public.categories (
     name TEXT NOT NULL,
     icon TEXT,
     image_url TEXT,
+    whatsapp_number TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure whatsapp_number exists on existing tables
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 
 -- 2. PRODUCTS TABLE
 CREATE TABLE IF NOT EXISTS public.products (
