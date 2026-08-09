@@ -14,6 +14,20 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { isSupabaseConfigured } from '../lib/supabase';
+import {
+  subscribeToProductsSupabase,
+  subscribeToCategoriesSupabase,
+  subscribeToOrdersSupabase,
+  addCategorySupabase,
+  updateCategorySupabase,
+  deleteCategorySupabase,
+  addProductSupabase,
+  updateProductSupabase,
+  deleteProductSupabase,
+  createOrderSupabase,
+  updateOrderStatusSupabase
+} from './supabaseService';
 import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats } from '../types';
 
 const PRODUCTS_COLLECTION = 'products';
@@ -181,6 +195,13 @@ export function subscribeToProducts(
   onUpdate: (products: Product[]) => void,
   includeInactive = false
 ) {
+  if (isSupabaseConfigured()) {
+    return subscribeToProductsSupabase((prods) => {
+      const filtered = includeInactive ? prods : prods.filter(p => p.active !== false);
+      onUpdate(filtered);
+    });
+  }
+
   try {
     const colRef = collection(db, PRODUCTS_COLLECTION);
 
@@ -223,6 +244,10 @@ export function subscribeToProducts(
 
 // Subscribe to Categories in real-time
 export function subscribeToCategories(onUpdate: (categories: Category[]) => void) {
+  if (isSupabaseConfigured()) {
+    return subscribeToCategoriesSupabase(onUpdate);
+  }
+
   try {
     const colRef = collection(db, CATEGORIES_COLLECTION);
 
@@ -256,6 +281,11 @@ export function subscribeToCategories(onUpdate: (categories: Category[]) => void
 
 // Add Category (Admin)
 export async function addCategory(category: Omit<Category, 'id'>): Promise<string> {
+  if (isSupabaseConfigured()) {
+    const res = await addCategorySupabase(category);
+    return res ? res.id : '';
+  }
+
   try {
     const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
       ...category,
@@ -270,6 +300,10 @@ export async function addCategory(category: Omit<Category, 'id'>): Promise<strin
 
 // Update Category (Admin)
 export async function updateCategory(id: string, updates: Partial<Category>): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return updateCategorySupabase(id, updates);
+  }
+
   try {
     const docRef = doc(db, CATEGORIES_COLLECTION, id);
     await updateDoc(docRef, updates);
@@ -280,6 +314,10 @@ export async function updateCategory(id: string, updates: Partial<Category>): Pr
 
 // Delete Category (Admin)
 export async function deleteCategory(id: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return deleteCategorySupabase(id);
+  }
+
   try {
     const docRef = doc(db, CATEGORIES_COLLECTION, id);
     await deleteDoc(docRef);
@@ -290,6 +328,11 @@ export async function deleteCategory(id: string): Promise<void> {
 
 // Add Product (Admin)
 export async function addProduct(product: Omit<Product, 'id'>): Promise<string> {
+  if (isSupabaseConfigured()) {
+    const res = await addProductSupabase(product);
+    return res ? res.id : '';
+  }
+
   try {
     const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), {
       ...product,
@@ -304,6 +347,10 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<string> 
 
 // Update Product (Admin)
 export async function updateProduct(id: string, updates: Partial<Product>): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return updateProductSupabase(id, updates);
+  }
+
   try {
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
     await updateDoc(docRef, updates);
@@ -314,6 +361,10 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
 
 // Delete Product (Admin)
 export async function deleteProduct(id: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return deleteProductSupabase(id);
+  }
+
   try {
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
     await deleteDoc(docRef);
@@ -332,6 +383,22 @@ export async function createOrder(
   customer: CustomerInfo,
   cartItems: CartItem[]
 ): Promise<{ orderId: string; displayOrderNum: string }> {
+  if (isSupabaseConfigured()) {
+    const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const orderId = await createOrderSupabase(
+      {
+        customer_name: customer.name.trim(),
+        customer_phone: customer.phone.trim(),
+        customer_address: customer.address.trim(),
+        notes: customer.notes.trim()
+      },
+      cartItems,
+      totalPrice
+    );
+    const displayOrderNum = `DZ-${orderId.slice(-6).toUpperCase()}`;
+    return { orderId, displayOrderNum };
+  }
+
   try {
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const now = new Date().toISOString();
@@ -375,6 +442,10 @@ export async function createOrder(
 
 // Subscribe to Orders in real-time (Admin)
 export function subscribeToOrders(onUpdate: (orders: Order[]) => void) {
+  if (isSupabaseConfigured()) {
+    return subscribeToOrdersSupabase(onUpdate);
+  }
+
   try {
     const ordersRef = collection(db, ORDERS_COLLECTION);
 
@@ -419,6 +490,10 @@ export function subscribeToOrders(onUpdate: (orders: Order[]) => void) {
 
 // Update Order Status (Admin)
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return updateOrderStatusSupabase(orderId, status);
+  }
+
   try {
     const orderRef = doc(db, ORDERS_COLLECTION, orderId);
     await updateDoc(orderRef, {
