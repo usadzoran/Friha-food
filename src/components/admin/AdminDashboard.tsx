@@ -50,8 +50,11 @@ import {
   Send,
   Check,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  BellRing,
+  Volume2
 } from 'lucide-react';
+import { playOrderNotificationSound, requestBrowserNotificationPermission } from '../../utils/notificationSound';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -775,6 +778,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       : '0%'}
                   </div>
                   <p className="text-[10px] text-slate-400 font-medium">من الزوار إلى طلبات ناجحة</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Order Notifications & Audio Sound System Card */}
+            <div className="bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-emerald-600/40 relative overflow-hidden space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-700/60 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-lg animate-bounce">
+                    <BellRing className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-white">نظام التنبيهات والإشعارات الفورية للطلبات</h3>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <span>مُفعّل بالصوت والرسائل</span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-100 mt-0.5">
+                      يصدر جرس تنبيه صوتي عالي الوضوح وإشعار سطح المكتب فور قيام أي زبون بإرسال طلبية جديدة
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => playOrderNotificationSound()}
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 active:scale-95"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>🔊 تجربة نغمة التنبيه</span>
+                  </button>
+
+                  <button
+                    onClick={() => requestBrowserNotificationPermission()}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+                  >
+                    <BellRing className="w-4 h-4 text-emerald-300" />
+                    <span>تفعيل إشعارات المتصفح</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-amber-300 font-bold">
+                    <span>🔔 جرس صوتي نقي</span>
+                    <span className="bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded text-[10px]">تلقائي</span>
+                  </div>
+                  <p className="text-emerald-100 text-[11px] leading-relaxed">
+                    تقنية Web Audio API تضمن صدور نغمة ثلاثية مميزة بدون الحاجة لتنزيل ملفات خارجية.
+                  </p>
+                </div>
+
+                <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-emerald-300 font-bold">
+                    <span>📱 نافذة تنبيه متحرّكة</span>
+                    <span className="bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded text-[10px]">مباشر</span>
+                  </div>
+                  <p className="text-emerald-100 text-[11px] leading-relaxed">
+                    تظهر نافذة بارزة تحتوي على اسم الزبون، هاتفه، عنوانه ورقم واتساب المباشر للتواصل.
+                  </p>
+                </div>
+
+                <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-blue-300 font-bold">
+                    <span>🟢 شريط العلو المباشر</span>
+                    <span className="bg-blue-400/20 text-blue-300 px-2 py-0.5 rounded text-[10px]">عداد الطلبات</span>
+                  </div>
+                  <p className="text-emerald-100 text-[11px] leading-relaxed">
+                    جرس علوي يحتوي على شارة حمراء توضح عدد الطلبات التي وردت خلال الجلسة الحالية.
+                  </p>
                 </div>
               </div>
             </div>

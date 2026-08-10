@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats } from './types';
 import { 
   seedProductsIfEmpty, 
@@ -20,6 +20,8 @@ import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSection';
+import { NewOrderNotificationToast } from './components/NewOrderNotificationToast';
+import { playOrderNotificationSound, showBrowserNotification } from './utils/notificationSound';
 
 import { 
   Truck, 
@@ -45,6 +47,12 @@ export default function App() {
   const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Order Notification Alerts State
+  const [latestNewOrder, setLatestNewOrder] = useState<Order | null>(null);
+  const [unreadOrdersCount, setUnreadOrdersCount] = useState<number>(0);
+  const isInitialOrdersLoaded = useRef<boolean>(false);
+  const knownOrderIds = useRef<Set<string>>(new Set());
 
   // Cart & Modals state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -199,9 +207,28 @@ export default function App() {
       }
     });
 
-    // Subscribe to orders for admin
+    // Subscribe to orders for admin & real-time order alerts
     const unsubscribeOrders = subscribeToOrders((orderList) => {
       setOrders(orderList);
+
+      if (!isInitialOrdersLoaded.current) {
+        isInitialOrdersLoaded.current = true;
+        orderList.forEach((o) => knownOrderIds.current.add(o.id));
+      } else {
+        // Detect newly arrived orders in real time
+        const newlyArrived = orderList.filter((o) => !knownOrderIds.current.has(o.id));
+        if (newlyArrived.length > 0) {
+          newlyArrived.forEach((o) => knownOrderIds.current.add(o.id));
+          const newest = newlyArrived[0];
+          setLatestNewOrder(newest);
+          setUnreadOrdersCount((prev) => prev + newlyArrived.length);
+          playOrderNotificationSound();
+          showBrowserNotification(
+            `🔔 طلب جديد #DZ-${newest.id.slice(-6).toUpperCase()}!`,
+            `الزبون: ${newest.customer_name} | المجموع: ${(newest.total_price || (newest as any).total_amount || 0).toLocaleString('ar-DZ')} د.ج`
+          );
+        }
+      }
     });
 
     // Track site visit
@@ -371,6 +398,9 @@ export default function App() {
         }}
         isAdmin={isAdminLoggedIn && activeView === 'admin'}
         onLogoutAdmin={handleAdminLogout}
+        unreadCount={unreadOrdersCount}
+        recentOrders={orders}
+        onClearUnread={() => setUnreadOrdersCount(0)}
       />
 
       {/* Main Content View Switcher */}
@@ -906,6 +936,19 @@ export default function App() {
         isOpen={isAdminModalOpen}
         onClose={handleCloseAdminModal}
         onLoginSuccess={handleAdminLoginSuccess}
+      />
+
+      {/* Real-time Order Notification Toast */}
+      <NewOrderNotificationToast
+        order={latestNewOrder}
+        onClose={() => setLatestNewOrder(null)}
+        onOpenAdminOrders={() => {
+          if (!isAdminLoggedIn) {
+            setIsAdminModalOpen(true);
+          } else {
+            navigateToAdmin();
+          }
+        }}
       />
 
     </div>

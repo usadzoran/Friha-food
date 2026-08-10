@@ -1,9 +1,10 @@
 import React from 'react';
-import { CheckCircle2, PhoneCall, ShoppingBag } from 'lucide-react';
+import { CheckCircle2, PhoneCall, ShoppingBag, MessageSquare, Bell } from 'lucide-react';
 
 interface OrderSuccessModalProps {
   orderNumber: string | null;
   onClose: () => void;
+  customerPhone?: string;
 }
 
 export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
@@ -27,9 +28,10 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
           <h2 className="text-2xl font-black text-slate-800">
             تم إرسال طلبك بنجاح!
           </h2>
-          <p className="text-sm font-bold text-emerald-700 bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-100 max-w-xs mx-auto">
-            سنتواصل معك لتأكيد الطلب.
-          </p>
+          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-100 max-w-xs mx-auto">
+            <Bell className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>تم تنبيه إدارة المتجر فوراً بالطلب الجديد</span>
+          </div>
         </div>
 
         {/* Order Number Card */}
