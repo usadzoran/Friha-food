@@ -29,6 +29,8 @@ import {
   deleteProductSupabase,
   createOrderSupabase,
   updateOrderStatusSupabase,
+  deleteOrderSupabase,
+  deleteDeliveredOrdersSupabase,
   getWhatsappMessagesSupabase,
   subscribeToWhatsappMessagesSupabase,
   triggerWhatsappOrderDispatch,
@@ -579,6 +581,65 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${ORDERS_COLLECTION}/${orderId}`);
+  }
+}
+
+// Delete a single order (Admin)
+export async function deleteOrder(orderId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return deleteOrderSupabase(orderId);
+  }
+
+  try {
+    // 1. Delete associated order items
+    const itemsQuery = query(collection(db, ORDER_ITEMS_COLLECTION), where('order_id', '==', orderId));
+    const itemsSnap = await getDocs(itemsQuery);
+    const batch = writeBatch(db);
+    itemsSnap.docs.forEach(docSnap => {
+      batch.delete(docSnap.ref);
+    });
+
+    // 2. Delete order document
+    const orderRef = doc(db, ORDERS_COLLECTION, orderId);
+    batch.delete(orderRef);
+
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${ORDERS_COLLECTION}/${orderId}`);
+    throw error;
+  }
+}
+
+// Delete all delivered orders (Admin)
+export async function deleteDeliveredOrders(): Promise<number> {
+  if (isSupabaseConfigured()) {
+    return deleteDeliveredOrdersSupabase();
+  }
+
+  try {
+    const ordersQuery = query(collection(db, ORDERS_COLLECTION), where('status', '==', 'delivered'));
+    const ordersSnap = await getDocs(ordersQuery);
+    if (ordersSnap.empty) return 0;
+
+    const orderIds = ordersSnap.docs.map(d => d.id);
+    const batch = writeBatch(db);
+
+    for (const docSnap of ordersSnap.docs) {
+      batch.delete(docSnap.ref);
+    }
+
+    // Delete related items
+    for (const ordId of orderIds) {
+      const itemsQuery = query(collection(db, ORDER_ITEMS_COLLECTION), where('order_id', '==', ordId));
+      const itemsSnap = await getDocs(itemsQuery);
+      itemsSnap.docs.forEach(d => batch.delete(d.ref));
+    }
+
+    await batch.commit();
+    return orderIds.length;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, ORDERS_COLLECTION);
+    throw error;
   }
 }
 

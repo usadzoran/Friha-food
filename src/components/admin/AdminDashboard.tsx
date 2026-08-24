@@ -6,6 +6,8 @@ import {
   deleteProduct, 
   toggleProductActive, 
   updateOrderStatus,
+  deleteOrder,
+  deleteDeliveredOrders,
   addCategory,
   updateCategory,
   deleteCategory,
@@ -217,6 +219,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Retrying state map
   const [isRetryingMap, setIsRetryingMap] = useState<Record<string, boolean>>({});
+
+  // Order Deletion States
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [isDeletingAllDelivered, setIsDeletingAllDelivered] = useState(false);
+  const [orderNotice, setOrderNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     getWhatsappConfigStatus().then(setWhatsappConfigStatus);
@@ -604,6 +611,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Order status update
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
     await updateOrderStatus(orderId, status);
+  };
+
+  // Delete a single order (Admin)
+  const handleDeleteOrder = async (orderId: string, customerName: string) => {
+    const displayNum = `DZ-${orderId.slice(-6).toUpperCase()}`;
+    if (!window.confirm(`هل أنت متأكد من حذف الطلبية (${displayNum}) الخاصة بالزبون "${customerName}" نهائياً من قاعدة البيانات والسجل؟\n\nتنبيه: سيتم مسح بيانات الطلبية وتفاصيلها بشكل نهائي ولا يمكن التراجع عن هذا الإجراء.`)) {
+      return;
+    }
+
+    try {
+      setDeletingOrderId(orderId);
+      await deleteOrder(orderId);
+      setOrderNotice({
+        type: 'success',
+        message: `تم حذف الطلبية (${displayNum}) بنجاح من قاعدة البيانات.`
+      });
+      setTimeout(() => setOrderNotice(null), 4000);
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      setOrderNotice({
+        type: 'error',
+        message: `فشل حذف الطلبية: ${err?.message || 'حدث خطأ غير متوقع'}`
+      });
+      setTimeout(() => setOrderNotice(null), 4000);
+    } finally {
+      setDeletingOrderId(null);
+    }
+  };
+
+  // Delete all delivered orders (Admin)
+  const handleDeleteAllDelivered = async () => {
+    const count = deliveredOrders.length;
+    if (count === 0) {
+      alert('لا توجد أي طلبيات مسلّمة حالياً لحذفها.');
+      return;
+    }
+
+    if (!window.confirm(`⚠️ تنبيه مسح الطلبيات المسلّمة:\n\nهل أنت متأكد من مسح جميع الطلبيات المسلّمة (${count} طلبية) نهائياً من قاعدة البيانات والسجل الأرشيفي؟\n\nتنبيه: سيتم مسح كافة عناصر وتفاصيل هذه الطلبيات بشكل نهائي ولا يمكن استرجاعها.`)) {
+      return;
+    }
+
+    try {
+      setIsDeletingAllDelivered(true);
+      const deletedCount = await deleteDeliveredOrders();
+      setOrderNotice({
+        type: 'success',
+        message: `تم مسح جميع الطلبيات المسلّمة بنجاح (${deletedCount || count} طلبية).`
+      });
+      setTimeout(() => setOrderNotice(null), 5000);
+    } catch (err: any) {
+      console.error('Error deleting delivered orders:', err);
+      setOrderNotice({
+        type: 'error',
+        message: `فشل مسح الطلبيات المسلّمة: ${err?.message || 'يرجى المحاولة مجدداً'}`
+      });
+      setTimeout(() => setOrderNotice(null), 5000);
+    } finally {
+      setIsDeletingAllDelivered(false);
+    }
   };
 
   // Calculated Stats
@@ -1585,10 +1651,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                           <button
                             onClick={() => handleUpdateStatus(order.id, 'cancelled')}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-slate-200 hover:border-red-200 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-amber-50 text-amber-700 font-bold text-xs rounded-xl border border-slate-200 hover:border-amber-200 transition-colors"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             <span>إلغاء الطلب</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteOrder(order.id, order.customer_name)}
+                            disabled={deletingOrderId === order.id}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-xl border border-slate-200 hover:border-rose-200 transition-colors disabled:opacity-50 cursor-pointer"
+                            title="حذف الطلبية نهائياً من قاعدة البيانات"
+                          >
+                            <Trash2 className={`w-3.5 h-3.5 ${deletingOrderId === order.id ? 'animate-spin' : ''}`} />
+                            <span>حذف</span>
                           </button>
                         </div>
                       </div>
@@ -1731,10 +1807,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'order_history' && (
           <div className="space-y-4 animate-in fade-in duration-200">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-              <div>
-                <h2 className="text-lg font-black text-slate-800">سجل الطلبات الأرشيفي</h2>
-                <p className="text-xs text-slate-500">الطلبات المسلّمة والملغاة المحفوظة في قاعدة البيانات</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-lg font-black text-slate-800">سجل الطلبات الأرشيفي</h2>
+                  <p className="text-xs text-slate-500">الطلبات المسلّمة والملغاة المحفوظة في قاعدة البيانات</p>
+                </div>
+
+                {/* Bulk Delete Delivered Orders Button */}
+                <button
+                  onClick={handleDeleteAllDelivered}
+                  disabled={deliveredOrders.length === 0 || isDeletingAllDelivered}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 self-start sm:self-auto ${
+                    deliveredOrders.length > 0 && !isDeletingAllDelivered
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-75'
+                  }`}
+                  title="مسح جميع الطلبيات المسلّمة نهائياً من قاعدة البيانات"
+                >
+                  <Trash2 className={`w-4 h-4 text-rose-600 ${isDeletingAllDelivered ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isDeletingAllDelivered ? 'جاري مسح الطلبيات...' : `مسح كافة الطلبيات المسلّمة (${deliveredOrders.length})`}
+                  </span>
+                </button>
               </div>
+
+              {orderNotice && (
+                <div className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 ${
+                  orderNotice.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                  {orderNotice.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />}
+                  <span>{orderNotice.message}</span>
+                </div>
+              )}
 
               {/* Filters & Search */}
               <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
@@ -1756,8 +1860,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-emerald-500 w-full sm:w-auto"
                   >
                     <option value="all">جميع الحالات</option>
-                    <option value="delivered">المسلّمة فقط</option>
-                    <option value="cancelled">الملغاة فقط</option>
+                    <option value="delivered">المسلّمة فقط ({deliveredOrders.length})</option>
+                    <option value="cancelled">الملغاة فقط ({cancelledOrders.length})</option>
                   </select>
                 </div>
               </div>
@@ -1779,11 +1883,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <th className="p-3">التاريخ</th>
                         <th className="p-3">المبلغ الإجمالي</th>
                         <th className="p-3">الحالة النهائية</th>
+                        <th className="p-3 text-center">حذف</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
                       {filteredHistory.map((order) => {
                         const displayNum = `DZ-${order.id.slice(-6).toUpperCase()}`;
+                        const isDeletingThis = deletingOrderId === order.id;
                         return (
                           <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="p-3 font-mono font-bold text-slate-800">
@@ -1809,6 +1915,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   ملغاة
                                 </span>
                               )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => handleDeleteOrder(order.id, order.customer_name)}
+                                disabled={isDeletingThis || isDeletingAllDelivered}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200 disabled:opacity-50 cursor-pointer"
+                                title="حذف هذه الطلبية نهائياً من قاعدة البيانات"
+                              >
+                                <Trash2 className={`w-4 h-4 ${isDeletingThis ? 'animate-spin text-red-600' : ''}`} />
+                              </button>
                             </td>
                           </tr>
                         );

@@ -296,6 +296,74 @@ export async function updateOrderStatusSupabase(orderId: string, status: OrderSt
   }
 }
 
+export async function deleteOrderSupabase(orderId: string): Promise<void> {
+  if (!supabase) return;
+
+  // 1. Delete associated order items
+  try {
+    await supabase.from('order_items').delete().eq('order_id', orderId);
+  } catch (err) {
+    console.warn('Error deleting order items:', err);
+  }
+
+  // 2. Delete whatsapp logs if any
+  try {
+    await supabase.from('whatsapp_order_messages').delete().eq('order_id', orderId);
+  } catch {}
+
+  // 3. Delete order
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', orderId);
+
+  if (error) {
+    console.error('Supabase error deleting order:', error);
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDeliveredOrdersSupabase(): Promise<number> {
+  if (!supabase) return 0;
+
+  // 1. Find all delivered order ids
+  const { data: delivered, error: fetchErr } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('status', 'delivered');
+
+  if (fetchErr || !delivered || delivered.length === 0) {
+    return 0;
+  }
+
+  const ids = delivered.map((d: any) => d.id);
+
+  // 2. Delete associated items
+  try {
+    await supabase.from('order_items').delete().in('order_id', ids);
+  } catch (err) {
+    console.warn('Error deleting items for delivered orders:', err);
+  }
+
+  // 3. Delete whatsapp logs
+  try {
+    await supabase.from('whatsapp_order_messages').delete().in('order_id', ids);
+  } catch {}
+
+  // 4. Delete the delivered orders
+  const { error: delErr } = await supabase
+    .from('orders')
+    .delete()
+    .in('id', ids);
+
+  if (delErr) {
+    console.error('Supabase error deleting delivered orders:', delErr);
+    throw new Error(delErr.message);
+  }
+
+  return ids.length;
+}
+
 // WhatsApp messages tracking and operations
 export async function getWhatsappMessagesSupabase(orderId?: string): Promise<WhatsappOrderMessage[]> {
   // Try server endpoint first (which checks Supabase and local store fallback)
