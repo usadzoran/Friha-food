@@ -69,4 +69,26 @@ export interface VisitorStats {
   daily_history?: DailyVisit[];
 }
 
-export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history';
+export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history' | 'whatsapp_settings';
+
+export type WhatsappMessageStatus = 'pending' | 'sent' | 'failed';
+
+export interface WhatsappOrderMessage {
+  id: string;
+  order_id: string;
+  category_id: string;
+  whatsapp_number: string;
+  message: string;
+  status: WhatsappMessageStatus;
+  provider_message_id?: string;
+  error_message?: string;
+  sent_at?: string;
+  created_at: string;
+}
+
+export interface WhatsappConfigStatus {
+  isConfigured: boolean;
+  hasToken: boolean;
+  phoneNumberId: string;
+  wabaId: string;
+}

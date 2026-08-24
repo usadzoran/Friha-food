@@ -19,6 +19,8 @@ import {
   subscribeToProductsSupabase,
   subscribeToCategoriesSupabase,
   subscribeToOrdersSupabase,
+  getCategoriesSupabase,
+  getProductsSupabase,
   addCategorySupabase,
   updateCategorySupabase,
   deleteCategorySupabase,
@@ -26,7 +28,15 @@ import {
   updateProductSupabase,
   deleteProductSupabase,
   createOrderSupabase,
-  updateOrderStatusSupabase
+  updateOrderStatusSupabase,
+  getWhatsappMessagesSupabase,
+  subscribeToWhatsappMessagesSupabase,
+  triggerWhatsappOrderDispatch,
+  getWhatsappConfigStatus,
+  saveWhatsappConfig,
+  testWhatsappMessage,
+  trackSiteVisitSupabase,
+  subscribeToVisitorStatsSupabase
 } from './supabaseService';
 import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats } from '../types';
 
@@ -97,6 +107,34 @@ const INITIAL_ALGERIAN_PRODUCTS: Omit<Product, 'id'>[] = [
 
 // Restore default initial categories and products if missing or requested
 export async function restoreDefaultData(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      const currentCats = await getCategoriesSupabase();
+      if (currentCats.length === 0) {
+        for (const cat of INITIAL_CATEGORIES) {
+          await addCategorySupabase(cat);
+        }
+      }
+      const prods = await getProductsSupabase();
+      const existingNames = new Set(prods.map(p => p.name));
+      const freshCats = await getCategoriesSupabase();
+      for (let idx = 0; idx < INITIAL_ALGERIAN_PRODUCTS.length; idx++) {
+        const prod = INITIAL_ALGERIAN_PRODUCTS[idx];
+        if (!existingNames.has(prod.name)) {
+          const catObj = freshCats.length > 0 ? freshCats[idx % freshCats.length] : null;
+          await addProductSupabase({
+            ...prod,
+            category_id: catObj ? catObj.id : ''
+          });
+        }
+      }
+      return;
+    } catch (err) {
+      console.error('Error restoring data in Supabase:', err);
+      return;
+    }
+  }
+
   try {
     // 1. Check or seed categories
     let currentCats = await seedCategoriesIfEmpty();
@@ -143,6 +181,24 @@ export async function restoreDefaultData(): Promise<void> {
 
 // Seed initial categories if empty
 export async function seedCategoriesIfEmpty(): Promise<Category[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const cats = await getCategoriesSupabase();
+      if (cats.length === 0) {
+        const created: Category[] = [];
+        for (const cat of INITIAL_CATEGORIES) {
+          const res = await addCategorySupabase(cat);
+          created.push(res);
+        }
+        return created;
+      }
+      return cats;
+    } catch (err) {
+      console.error('Error seeding categories in Supabase:', err);
+      return [];
+    }
+  }
+
   try {
     const snap = await getDocs(collection(db, CATEGORIES_COLLECTION));
     if (snap.empty) {
@@ -167,6 +223,27 @@ export async function seedCategoriesIfEmpty(): Promise<Category[]> {
 
 // Seed initial products if db is empty
 export async function seedProductsIfEmpty(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      const prods = await getProductsSupabase();
+      if (prods.length === 0) {
+        const cats = await seedCategoriesIfEmpty();
+        for (let idx = 0; idx < INITIAL_ALGERIAN_PRODUCTS.length; idx++) {
+          const prod = INITIAL_ALGERIAN_PRODUCTS[idx];
+          const catObj = cats.length > 0 ? cats[idx % cats.length] : null;
+          await addProductSupabase({
+            ...prod,
+            category_id: catObj ? catObj.id : ''
+          });
+        }
+      }
+      return;
+    } catch (err) {
+      console.error('Error seeding products in Supabase:', err);
+      return;
+    }
+  }
+
   try {
     const currentCats = await seedCategoriesIfEmpty();
     const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
@@ -510,6 +587,10 @@ const ANALYTICS_COLLECTION = 'analytics';
 const SITE_VISITORS_DOC = 'site_visitors';
 
 export async function trackSiteVisit(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return trackSiteVisitSupabase();
+  }
+
   try {
     const docRef = doc(db, ANALYTICS_COLLECTION, SITE_VISITORS_DOC);
     const snap = await getDoc(docRef);
@@ -581,6 +662,10 @@ export async function trackSiteVisit(): Promise<void> {
 }
 
 export function subscribeToVisitorStats(onUpdate: (stats: VisitorStats) => void) {
+  if (isSupabaseConfigured()) {
+    return subscribeToVisitorStatsSupabase(onUpdate);
+  }
+
   try {
     const docRef = doc(db, ANALYTICS_COLLECTION, SITE_VISITORS_DOC);
 
@@ -607,4 +692,13 @@ export function subscribeToVisitorStats(onUpdate: (stats: VisitorStats) => void)
     return () => {};
   }
 }
+
+export {
+  getWhatsappMessagesSupabase,
+  subscribeToWhatsappMessagesSupabase,
+  triggerWhatsappOrderDispatch,
+  getWhatsappConfigStatus,
+  saveWhatsappConfig,
+  testWhatsappMessage
+};
 

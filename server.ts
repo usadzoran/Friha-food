@@ -3,6 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import {
+  dispatchOrderToWhatsAppDepartments,
+  getPublicConfigStatus,
+  saveLocalConfig,
+  sendWhatsAppCloudMessage,
+  getAllWhatsappMessages
+} from './server/whatsapp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +23,78 @@ async function startServer() {
   // API Health Endpoint
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // WhatsApp Configuration Status (Public safe status, no secrets exposed)
+  app.get('/api/whatsapp-status', (req, res) => {
+    try {
+      const status = getPublicConfigStatus();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Save WhatsApp Configuration (Server-Side only)
+  app.post('/api/whatsapp-config', (req, res) => {
+    try {
+      const { phoneNumberId, wabaId, accessToken } = req.body;
+      const updated = saveLocalConfig({ phoneNumberId, wabaId, accessToken });
+      res.json({
+        success: true,
+        message: 'تم حفظ إعدادات WhatsApp Cloud API بنجاح على الخادم.',
+        config: getPublicConfigStatus()
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // Test WhatsApp Cloud Message Send
+  app.post('/api/whatsapp-test', async (req, res) => {
+    try {
+      const { toPhone, message } = req.body;
+      if (!toPhone) {
+        return res.status(400).json({ success: false, error: 'رقم هاتف الواتساب مطلوب.' });
+      }
+
+      const testMsg = message || `🔔 رسالة تجريبية من متجر (اشري من دارك)\nتم التحقق من ربط WhatsApp Cloud API بنجاح! 🚀\nالوقت: ${new Date().toLocaleTimeString('ar-DZ')}`;
+      const result = await sendWhatsAppCloudMessage(toPhone, testMsg);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // Auto-Dispatch Order to Departments via WhatsApp
+  app.post('/api/send-order-whatsapp', async (req, res) => {
+    try {
+      const { order_id, category_id, force_retry } = req.body;
+      if (!order_id) {
+        return res.status(400).json({ success: false, error: 'order_id is required' });
+      }
+
+      const result = await dispatchOrderToWhatsAppDepartments(order_id, {
+        targetCategoryId: category_id,
+        forceRetry: Boolean(force_retry)
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('Error in /api/send-order-whatsapp:', err);
+      res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // Get WhatsApp Messages for orders (Logs)
+  app.get('/api/whatsapp-messages', (req, res) => {
+    try {
+      const orderId = req.query.order_id as string | undefined;
+      const messages = getAllWhatsappMessages(orderId);
+      res.json(messages);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
   });
 
   // Vite middleware in development or static serving in production

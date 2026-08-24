@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats, WhatsappOrderMessage, WhatsappConfigStatus } from '../../types';
 import { 
   addProduct, 
   updateProduct, 
@@ -9,7 +9,13 @@ import {
   addCategory,
   updateCategory,
   deleteCategory,
-  restoreDefaultData
+  restoreDefaultData,
+  getWhatsappMessagesSupabase,
+  subscribeToWhatsappMessagesSupabase,
+  triggerWhatsappOrderDispatch,
+  getWhatsappConfigStatus,
+  saveWhatsappConfig,
+  testWhatsappMessage
 } from '../../services/storeService';
 import { 
   LayoutDashboard, 
@@ -52,7 +58,15 @@ import {
   AlertCircle,
   ExternalLink,
   BellRing,
-  Volume2
+  Volume2,
+  Key,
+  Shield,
+  SendHorizontal,
+  RefreshCw,
+  CheckCircle2,
+  HelpCircle,
+  Copy,
+  Smartphone
 } from 'lucide-react';
 import { playOrderNotificationSound, requestBrowserNotificationPermission } from '../../utils/notificationSound';
 
@@ -179,6 +193,123 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     image_url: '',
     whatsapp_number: ''
   });
+
+  // WhatsApp Cloud API State & Messages Log
+  const [whatsappMessages, setWhatsappMessages] = useState<WhatsappOrderMessage[]>([]);
+  const [whatsappConfigStatus, setWhatsappConfigStatus] = useState<WhatsappConfigStatus>({
+    isConfigured: false,
+    hasToken: false,
+    phoneNumberId: '',
+    wabaId: ''
+  });
+  const [configForm, setConfigForm] = useState({
+    phoneNumberId: '',
+    wabaId: '',
+    accessToken: ''
+  });
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [configNotice, setConfigNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Live WhatsApp Test State
+  const [testRecipientPhone, setTestRecipientPhone] = useState('');
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testResultNotice, setTestResultNotice] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
+
+  // Retrying state map
+  const [isRetryingMap, setIsRetryingMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    getWhatsappConfigStatus().then(setWhatsappConfigStatus);
+    const unsubscribe = subscribeToWhatsappMessagesSupabase((msgs) => {
+      setWhatsappMessages(msgs);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const handleSaveWhatsAppConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configForm.phoneNumberId.trim() || !configForm.accessToken.trim()) {
+      setConfigNotice({
+        type: 'error',
+        message: 'يرجى إدخال Phone Number ID و Access Token على الأقل.'
+      });
+      return;
+    }
+
+    try {
+      setIsSavingConfig(true);
+      setConfigNotice(null);
+      const res = await saveWhatsappConfig(configForm);
+      if (res.success) {
+        setConfigNotice({ type: 'success', message: 'تم حفظ وتشفير إعدادات WhatsApp Cloud API في الخادم بنجاح!' });
+        setWhatsappConfigStatus(res.config);
+        setConfigForm(prev => ({ ...prev, accessToken: '' }));
+      } else {
+        setConfigNotice({ type: 'error', message: res.error || 'فشل حفظ الإعدادات.' });
+      }
+    } catch (err: any) {
+      setConfigNotice({ type: 'error', message: err?.message || 'حدث خطأ أثناء حفظ الإعدادات.' });
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleSendTestMessage = async () => {
+    if (!testRecipientPhone.trim()) {
+      setTestResultNotice({ type: 'error', message: 'يرجى إدخال رقم هاتف واتساب للاختبار.' });
+      return;
+    }
+
+    try {
+      setIsSendingTest(true);
+      setTestResultNotice(null);
+      const res = await testWhatsappMessage(testRecipientPhone.trim());
+      if (res.success) {
+        setTestResultNotice({
+          type: 'success',
+          message: 'تم إرسال الرسالة التجريبية بنجاح عبر WhatsApp Cloud API!',
+          details: `Message ID: ${res.messageId}`
+        });
+      } else {
+        setTestResultNotice({
+          type: 'error',
+          message: 'تعذر إرسال الرسالة التجريبية.',
+          details: res.error || 'تأكد من صحة الـ Token و Phone Number ID ورقم المستلم.'
+        });
+      }
+    } catch (err: any) {
+      setTestResultNotice({
+        type: 'error',
+        message: 'حدث خطأ في الاتصال بالخادم.',
+        details: err?.message
+      });
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  const handleRetryDepartmentDispatch = async (orderId: string, categoryId?: string) => {
+    const key = `${orderId}_${categoryId || 'all'}`;
+    try {
+      setIsRetryingMap(prev => ({ ...prev, [key]: true }));
+      const res = await triggerWhatsappOrderDispatch(orderId, categoryId, true);
+      const updatedMsgs = await getWhatsappMessagesSupabase();
+      setWhatsappMessages(updatedMsgs);
+      
+      if (res.success) {
+        setSuccessNotice('تمت إعادة إرسال تفاصيل الطلب إلى WhatsApp القسم بنجاح!');
+      } else {
+        alert(res.message || 'تعذر إعادة الإرسال.');
+      }
+      setTimeout(() => setSuccessNotice(null), 4000);
+    } catch (err: any) {
+      alert('خطأ أثناء إعادة الإرسال: ' + err?.message);
+    } finally {
+      setIsRetryingMap(prev => ({ ...prev, [key]: false }));
+    }
+  };
 
   // WhatsApp Department Dispatch Modal State
   const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false);
@@ -592,6 +723,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <History className="w-4 h-4" />
               <span>سجل الطلبات ({historicOrders.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('whatsapp_settings')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                activeTab === 'whatsapp_settings'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Smartphone className="w-4 h-4 text-emerald-400" />
+              <span>إعدادات WhatsApp API</span>
+              {whatsappConfigStatus.isConfigured ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              ) : (
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                  غير مفعّل
+                </span>
+              )}
             </button>
 
             <button
@@ -1404,14 +1554,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       {/* Action buttons */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                        {/* WhatsApp Dispatch Button */}
+                        {/* Manual Custom Dispatch Modal Button */}
                         <button
                           onClick={() => handleOpenWhatsappModal(order)}
-                          className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl transition-all shadow-2xs hover:shadow-xs"
-                          title="إرسال تفاصيل هذا الطلب إلى قسم معين عبر WhatsApp"
+                          className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs rounded-xl transition-all shadow-2xs"
+                          title="معاينة أو إرسال يدوي عبر WhatsApp Web"
                         >
                           <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>📱 إرسال عبر WhatsApp</span>
+                          <span>📱 معاينة نص WhatsApp</span>
                         </button>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -1443,20 +1593,131 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </div>
 
-                      {/* Dispatch Logs if sent to departments */}
-                      {sentLogMap[order.id] && sentLogMap[order.id].length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                          <span className="font-bold text-emerald-800 flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            تم الإرسال عبر الواتساب إلى:
-                          </span>
-                          {sentLogMap[order.id].map((log, idx) => (
-                            <span key={idx} className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
-                              قسم {log.deptName} ({log.sentAt})
-                            </span>
-                          ))}
+                      {/* AUTOMATED WHATSAPP DISPATCH STATUS PER DEPARTMENT */}
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                            <Smartphone className="w-4 h-4 text-emerald-600" />
+                            <span>حالة إرسال WhatsApp التلقائي حسب القسم:</span>
+                          </div>
+                          <button
+                            onClick={() => handleRetryDepartmentDispatch(order.id)}
+                            disabled={isRetryingMap[`${order.id}_all`]}
+                            className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                            title="إعادة محاولة إرسال الطلب لجميع الأقسام عبر WhatsApp"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isRetryingMap[`${order.id}_all`] ? 'animate-spin' : ''}`} />
+                            <span>إعادة إرسال للكل</span>
+                          </button>
                         </div>
-                      )}
+
+                        {(() => {
+                          const orderCatIds: string[] = Array.from(new Set<string>((order.items || []).map(item => {
+                            const prod = products.find(p => p.id === item.product_id);
+                            return prod?.category_id || 'uncategorized';
+                          })));
+
+                          if (orderCatIds.length === 0) {
+                            return <div className="text-[11px] text-slate-400">لا توجد منتجات في هذا الطلب بعد.</div>;
+                          }
+
+                          return (
+                            <div className="space-y-2">
+                              {orderCatIds.map(catId => {
+                                const categoryObj = categories.find(c => c.id === catId);
+                                const catName = categoryObj ? categoryObj.name : (catId === 'uncategorized' ? 'قسم عام' : 'قسم غير محدد');
+                                const hasPhone = Boolean((categoryObj?.whatsapp_number || '').trim());
+                                const phone = categoryObj?.whatsapp_number || '';
+                                
+                                const msgRecord = whatsappMessages.find(m => m.order_id === order.id && m.category_id === catId);
+                                const isRetrying = isRetryingMap[`${order.id}_${catId}`];
+
+                                const catItems = (order.items || []).filter(item => {
+                                  const prod = products.find(p => p.id === item.product_id);
+                                  return (prod?.category_id || 'uncategorized') === catId;
+                                });
+
+                                return (
+                                  <div
+                                    key={catId}
+                                    className={`p-2.5 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all ${
+                                      msgRecord?.status === 'sent'
+                                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                                        : msgRecord?.status === 'failed'
+                                        ? 'bg-red-50/70 border-red-200 text-red-950'
+                                        : !hasPhone
+                                        ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                                        : 'bg-slate-100/70 border-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex flex-wrap items-center gap-2 font-bold">
+                                        {msgRecord?.status === 'sent' ? (
+                                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                        ) : msgRecord?.status === 'failed' ? (
+                                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                                        ) : (
+                                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                                        )}
+                                        <span>قسم {catName}</span>
+                                        <span className="text-[10px] font-normal text-slate-500">
+                                          ({catItems.length} {catItems.length === 1 ? 'منتج' : 'منتجات'})
+                                        </span>
+                                        {hasPhone ? (
+                                          <span className="text-[10px] font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600" dir="ltr">
+                                            {phone}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-bold">
+                                            ⚠️ بدون رقم WhatsApp
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="text-[11px] leading-relaxed">
+                                        {msgRecord?.status === 'sent' ? (
+                                          <div className="text-emerald-800 font-medium flex items-center gap-1.5">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                            <span>
+                                              🟢 تم إرسال الطلب تلقائياً إلى WhatsApp قسم {catName} بنجاح
+                                              {msgRecord.sent_at && ` • ${new Date(msgRecord.sent_at).toLocaleTimeString('ar-DZ')}`}
+                                            </span>
+                                          </div>
+                                        ) : msgRecord?.status === 'failed' ? (
+                                          <div className="text-red-800 font-medium flex items-start gap-1">
+                                            <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                                            <span>🔴 فشل الإرسال التلقائي: {msgRecord.error_message || 'فشل الاتصال بـ WhatsApp API.'}</span>
+                                          </div>
+                                        ) : (
+                                          <div className="text-slate-500">
+                                            {hasPhone ? 'في انتظار الإرسال التلقائي عبر WhatsApp Cloud API.' : 'يرجى تعيين رقم WhatsApp لهذا القسم في تبويب الأقسام.'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                                      <button
+                                        onClick={() => handleRetryDepartmentDispatch(order.id, catId)}
+                                        disabled={isRetrying}
+                                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs ${
+                                          msgRecord?.status === 'sent'
+                                            ? 'bg-white hover:bg-emerald-100/50 text-emerald-800 border border-emerald-300'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                        } disabled:opacity-50`}
+                                        title="إعادة إرسال تفاصيل هذا القسم إلى WhatsApp"
+                                      >
+                                        <RefreshCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
+                                        <span>{msgRecord?.status === 'sent' ? 'إعادة الإرسال' : 'إرسال الآن'}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
 
                     </div>
                   );
@@ -1557,6 +1818,254 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 6: WHATSAPP CLOUD API SETTINGS */}
+        {activeTab === 'whatsapp_settings' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-emerald-600" />
+                  <span>إعدادات وتكامل WhatsApp Business Cloud API</span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  نظام الإرسال الآلي للطلبات إلى WhatsApp الأقسام بدون تدخل يدوي من المدير وبشكل مشفر في الخادم
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div>
+                {whatsappConfigStatus.isConfigured ? (
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>WhatsApp API مفعل ومتصل</span>
+                  </span>
+                ) : (
+                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>غير مفعل بعد (بانتظار إدخال المفاتيح)</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left Column: API Configuration & Live Test Tool */}
+              <div className="lg:col-span-7 space-y-6">
+                
+                {/* Form Card */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                        <Key className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">مفاتيح Meta WhatsApp API (خادم مشفر)</h3>
+                        <p className="text-[11px] text-slate-400">يتم تخزين هذه المفاتيح في Server-Side فقط ولا تظهر للمستخدمين أبداً.</p>
+                      </div>
+                    </div>
+                    <Shield className="w-5 h-5 text-emerald-600" />
+                  </div>
+
+                  {configNotice && (
+                    <div className={`p-3.5 rounded-xl border text-xs font-bold flex items-start gap-2 ${
+                      configNotice.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+                    }`}>
+                      {configNotice.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                      <span>{configNotice.message}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveWhatsAppConfig} className="space-y-3.5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        WhatsApp Phone Number ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="مثال: 104589234857291"
+                        value={configForm.phoneNumberId}
+                        onChange={(e) => setConfigForm({ ...configForm, phoneNumberId: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                        dir="ltr"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        تجد هذا المعرف داخل Meta for Developers &gt; WhatsApp &gt; API Setup &gt; Phone number ID.
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        WhatsApp Business Account ID (WABA ID)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثال: 108472948572019"
+                        value={configForm.wabaId}
+                        onChange={(e) => setConfigForm({ ...configForm, wabaId: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Permanent Access Token (Meta System User Token) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="EAAB..."
+                        value={configForm.accessToken}
+                        onChange={(e) => setConfigForm({ ...configForm, accessToken: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                        dir="ltr"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        رمز وصول دائم (System User Token) مع صلاحيات <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">whatsapp_business_messaging</code>.
+                      </span>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isSavingConfig}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSavingConfig && <Loader2 className="w-4 h-4 animate-spin" />}
+                        <span>{isSavingConfig ? 'جاري الحفظ والتحقق...' : 'حفظ مفاتيح WhatsApp API'}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Live Message Test Card */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
+                        <SendHorizontal className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">اختبار الإرسال المباشر (Live Send Test)</h3>
+                        <p className="text-[11px] text-slate-400">أرسل رسالة تجريبية فورية للتحقق من أن ربط Meta API يعمل 100%.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {testResultNotice && (
+                    <div className={`p-3.5 rounded-xl border text-xs space-y-1 ${
+                      testResultNotice.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'
+                    }`}>
+                      <div className="font-bold flex items-center gap-1.5">
+                        {testResultNotice.type === 'success' ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+                        <span>{testResultNotice.message}</span>
+                      </div>
+                      {testResultNotice.details && (
+                        <div className="text-[11px] font-mono bg-white/70 p-2 rounded-lg border border-slate-200 mt-1 break-all" dir="ltr">
+                          {testResultNotice.details}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                    <input
+                      type="tel"
+                      placeholder="رقم WhatsApp للاختبار (مثال: 0550123456 أو 213550123456)"
+                      value={testRecipientPhone}
+                      onChange={(e) => setTestRecipientPhone(e.target.value)}
+                      className="flex-1 w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-teal-500 bg-slate-50"
+                      dir="ltr"
+                    />
+                    <button
+                      onClick={handleSendTestMessage}
+                      disabled={isSendingTest}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      {isSendingTest && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>{isSendingTest ? 'جاري الإرسال...' : 'إرسال رسالة تجريبية 🚀'}</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Right Column: Complete Step-by-Step Meta Setup Guide */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-4 text-xs">
+                  <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <HelpCircle className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <h3 className="font-bold text-sm text-white">دليل إعداد Meta / WhatsApp Platform</h3>
+                      <p className="text-[11px] text-slate-400">الخطوات اللازمة لتفعيل الإرسال التلقائي في حسابك</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 leading-relaxed text-slate-300">
+                    <div className="flex items-start gap-2.5 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                      <span className="bg-emerald-500 text-slate-950 font-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+                      <div>
+                        <strong className="text-white block mb-0.5">إنشاء حساب مطور في Meta:</strong>
+                        توجه إلى <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline font-mono">developers.facebook.com</a> وسجل الدخول بحساب Facebook الخاص بك.
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                      <span className="bg-emerald-500 text-slate-950 font-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+                      <div>
+                        <strong className="text-white block mb-0.5">إنشاء تطبيق (App) من نوع Business:</strong>
+                        اضغط على "Create App" واختر نوع "Other" ثم "Business"، ثم أضف منتج "WhatsApp" إلى التطبيق.
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                      <span className="bg-emerald-500 text-slate-950 font-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+                      <div>
+                        <strong className="text-white block mb-0.5">استخراج Phone Number ID:</strong>
+                        من القائمة الجانبية: WhatsApp &gt; API Setup، ستجد <code className="text-emerald-300 font-mono">Phone number ID</code> انسخه وضعه في الخانة المقابلة.
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                      <span className="bg-emerald-500 text-slate-950 font-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] shrink-0 mt-0.5">4</span>
+                      <div>
+                        <strong className="text-white block mb-0.5">إنشاء رمز وصول دائم (System User Token):</strong>
+                        من إعدادات Business Manager &gt; System Users، أنشئ مستخدم نظام جديد وامنحه إذن <code className="text-emerald-300 font-mono">whatsapp_business_messaging</code> ثم ولّد Token دائم بدون تاريخ انتهاء.
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                      <span className="bg-emerald-500 text-slate-950 font-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] shrink-0 mt-0.5">5</span>
+                      <div>
+                        <strong className="text-white block mb-0.5">ربط أرقام الأقسام:</strong>
+                        في تبويب "الأقسام"، ضع رقم WhatsApp الخاص بكل قسم. عند إنشاء الزبون لأي طلب، سيقوم النظام تلقائياً بتقسيم المنتجات وإرسال كل قسم إلى رقمه المحدد فوراً!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info Note on Cloud Run Architecture */}
+                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-2 text-xs text-emerald-900">
+                  <h4 className="font-bold flex items-center gap-1.5 text-emerald-800">
+                    <Shield className="w-4 h-4 text-emerald-700" />
+                    <span>حماية البيانات وعدم التكرار</span>
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-emerald-800/90">
+                    • يتم استدعاء WhatsApp Cloud API عبر مسار خلفي آمن (<code className="font-mono bg-white/70 px-1 py-0.5 rounded text-emerald-950">/api/send-order-whatsapp</code>).<br />
+                    • يتأكد النظام من عدم تكرار إرسال نفس الطلب لنفس القسم بالاعتماد على <code className="font-mono bg-white/70 px-1 py-0.5 rounded text-emerald-950">order_id + category_id</code>.<br />
+                    • في حالة فشل الاتصال، يتم تسجيل سبب الخطأ ويظل بإمكان المدير الضغط على 🔄 <strong>إعادة المحاولة</strong> بنقرة واحدة.
+                  </p>
+                </div>
+              </div>
+
+            </div>
           </div>
         )}
 
