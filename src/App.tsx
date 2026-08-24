@@ -60,6 +60,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [completedOrderNum, setCompletedOrderNum] = useState<string | null>(null);
+  const [lastCompletedOrderInfo, setLastCompletedOrderInfo] = useState<{ customer: CustomerInfo; items: CartItem[] } | null>(null);
 
   // Admin state
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
@@ -321,7 +322,12 @@ export default function App() {
     if (cartItems.length === 0) return;
     setIsSubmittingOrder(true);
     try {
-      const { displayOrderNum } = await createOrder(customer, cartItems);
+      const itemsSnapshot = [...cartItems];
+      const { displayOrderNum } = await createOrder(customer, itemsSnapshot);
+      setLastCompletedOrderInfo({
+        customer: { ...customer },
+        items: itemsSnapshot
+      });
       setCartItems([]);
       setIsCartOpen(false);
       setCompletedOrderNum(displayOrderNum);
@@ -929,7 +935,13 @@ export default function App() {
 
       <OrderSuccessModal
         orderNumber={completedOrderNum}
-        onClose={() => setCompletedOrderNum(null)}
+        onClose={() => {
+          setCompletedOrderNum(null);
+          setLastCompletedOrderInfo(null);
+        }}
+        customer={lastCompletedOrderInfo?.customer}
+        orderedItems={lastCompletedOrderInfo?.items}
+        categories={categories}
       />
 
       <AdminLoginModal

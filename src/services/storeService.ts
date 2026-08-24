@@ -38,7 +38,9 @@ import {
   saveWhatsappConfig,
   testWhatsappMessage,
   trackSiteVisitSupabase,
-  subscribeToVisitorStatsSupabase
+  subscribeToVisitorStatsSupabase,
+  saveCategoryWhatsappNumber,
+  syncCategoryWhatsAppFromServer
 } from './supabaseService';
 import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats } from '../types';
 
@@ -760,6 +762,8 @@ export {
   triggerWhatsappOrderDispatch,
   getWhatsappConfigStatus,
   saveWhatsappConfig,
-  testWhatsappMessage
+  testWhatsappMessage,
+  saveCategoryWhatsappNumber,
+  syncCategoryWhatsAppFromServer
 };
 

@@ -8,7 +8,10 @@ import {
   getPublicConfigStatus,
   saveLocalConfig,
   sendWhatsAppCloudMessage,
-  getAllWhatsappMessages
+  getAllWhatsappMessages,
+  getCategoryWhatsAppNumbers,
+  saveCategoryWhatsAppNumbers,
+  saveSingleCategoryWhatsAppNumber
 } from './server/whatsapp';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +49,39 @@ async function startServer() {
         config: getPublicConfigStatus()
       });
     } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // Get all Category WhatsApp Numbers
+  app.get('/api/category-whatsapp', (req, res) => {
+    try {
+      const numbers = getCategoryWhatsAppNumbers();
+      res.json({ success: true, numbers });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message, numbers: {} });
+    }
+  });
+
+  // Save/Update Category WhatsApp Numbers
+  app.post('/api/category-whatsapp', (req, res) => {
+    try {
+      const { categoryId, whatsappNumber, numbers } = req.body;
+      let updated: Record<string, string> = {};
+
+      if (numbers && typeof numbers === 'object') {
+        updated = saveCategoryWhatsAppNumbers(numbers);
+      } else if (categoryId) {
+        updated = saveSingleCategoryWhatsAppNumber(categoryId, whatsappNumber || '');
+      }
+
+      res.json({
+        success: true,
+        message: 'تم حفظ وتحديث رقم WhatsApp الخاص بالقسم بنجاح.',
+        numbers: updated
+      });
+    } catch (err: any) {
+      console.error('Error saving category WhatsApp number:', err);
       res.status(500).json({ success: false, error: err?.message });
     }
   });

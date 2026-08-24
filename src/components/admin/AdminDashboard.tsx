@@ -472,22 +472,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setIsSubmittingCategory(true);
       const finalImage = catForm.image_url.trim() || PRESET_IMAGES[0].url;
 
+      // Clean & normalize WhatsApp phone number
+      let rawPhone = catForm.whatsapp_number.trim();
+      let normalizedPhone = rawPhone.replace(/[^\d+]/g, '');
+      if (normalizedPhone.startsWith('+')) {
+        normalizedPhone = normalizedPhone.substring(1);
+      }
+      if (normalizedPhone.startsWith('00')) {
+        normalizedPhone = normalizedPhone.substring(2);
+      }
+      if (normalizedPhone.startsWith('0') && normalizedPhone.length >= 9) {
+        normalizedPhone = '213' + normalizedPhone.substring(1);
+      }
+
       if (editingCategory) {
         await updateCategory(editingCategory.id, {
           name: catForm.name.trim(),
           icon: catForm.icon,
           image_url: finalImage,
-          whatsapp_number: catForm.whatsapp_number.trim()
+          whatsapp_number: normalizedPhone
         });
-        setSuccessNotice('تم تعديل القسم والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+        setSuccessNotice('تم تعديل القسم وتحديث رقم WhatsApp الخاص به والمزامنة بنجاح!');
       } else {
         await addCategory({
           name: catForm.name.trim(),
           icon: catForm.icon,
           image_url: finalImage,
-          whatsapp_number: catForm.whatsapp_number.trim()
+          whatsapp_number: normalizedPhone
         });
-        setSuccessNotice('تم إضافة القسم الجديد بنجاح والمزامنة مع قاعدة البيانات وموقع المتجر مباشرة!');
+        setSuccessNotice('تم إضافة القسم الجديد ورقم WhatsApp بنجاح!');
       }
 
       setTimeout(() => setSuccessNotice(null), 5000);
@@ -1442,15 +1455,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               يحتوي على {categoryProducts.length} منتج
                             </span>
                             {cat.whatsapp_number ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 mt-1" dir="ltr">
-                                <MessageSquare className="w-3 h-3 text-emerald-600" />
-                                {cat.whatsapp_number}
-                              </span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200" dir="ltr">
+                                  <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                  {cat.whatsapp_number}
+                                </span>
+                                <a
+                                  href={`https://wa.me/${cat.whatsapp_number}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold underline"
+                                >
+                                  تجربة
+                                </a>
+                              </div>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditCategory(cat)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200 mt-1 cursor-pointer transition-colors"
+                              >
                                 <AlertCircle className="w-3 h-3 text-amber-600" />
-                                بدون رقم WhatsApp
-                              </span>
+                                <span>تعيين رقم WhatsApp</span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -2447,21 +2474,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                   <span>رقم WhatsApp الخاص بالقسم</span>
-                  <span className="text-[10px] text-emerald-600 font-normal">اختیاري</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">اختياري - لاستقبال طلبيات هذا القسم</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="مثال: 213550000000"
+                    placeholder="مثال: 0550123456 أو 213550123456"
                     value={catForm.whatsapp_number}
                     onChange={(e) => setCatForm({ ...catForm, whatsapp_number: e.target.value })}
-                    className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 bg-slate-50"
                     dir="ltr"
                   />
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 </div>
+                {catForm.whatsapp_number.trim() && (
+                  <div className="mt-1.5 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900 flex items-center justify-between">
+                    <span className="font-medium">الصيغة المعتمدة للإرسال:</span>
+                    <span className="font-mono font-bold text-emerald-700" dir="ltr">
+                      {(() => {
+                        let p = catForm.whatsapp_number.trim().replace(/[^\d+]/g, '');
+                        if (p.startsWith('+')) p = p.substring(1);
+                        if (p.startsWith('00')) p = p.substring(2);
+                        if (p.startsWith('0') && p.length >= 9) p = '213' + p.substring(1);
+                        return p;
+                      })()}
+                    </span>
+                  </div>
+                )}
                 <p className="text-[11px] text-slate-400 mt-1 leading-normal">
-                  أدخل الرقم بالصيغة الدولية بدون (+) أو مسافات، مثال للجزائر: <strong className="text-slate-600 font-mono" dir="ltr">213550000000</strong>
+                  يمكنك كتابة الرقم بصيغة محلية (مثل <strong className="text-slate-600 font-mono" dir="ltr">0550123456</strong>) أو دولية (مثل <strong className="text-slate-600 font-mono" dir="ltr">213550123456</strong>).
                 </p>
               </div>
 

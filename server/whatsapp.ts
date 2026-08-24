@@ -21,6 +21,41 @@ export interface SendResult {
 // In-memory / disk cache for messages if Supabase table isn't created yet
 const LOCAL_MESSAGES_FILE = path.join(process.cwd(), 'whatsapp_messages_store.json');
 const LOCAL_CONFIG_FILE = path.join(process.cwd(), 'whatsapp_config.json');
+const LOCAL_CATEGORY_WHATSAPP_FILE = path.join(process.cwd(), 'category_whatsapp_store.json');
+
+// Category WhatsApp Numbers Store (Persistent Map)
+export function getCategoryWhatsAppNumbers(): Record<string, string> {
+  try {
+    if (fs.existsSync(LOCAL_CATEGORY_WHATSAPP_FILE)) {
+      return JSON.parse(fs.readFileSync(LOCAL_CATEGORY_WHATSAPP_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Error reading category WhatsApp store:', err);
+  }
+  return {};
+}
+
+export function saveCategoryWhatsAppNumbers(map: Record<string, string>): Record<string, string> {
+  const current = getCategoryWhatsAppNumbers();
+  const merged = { ...current, ...map };
+  try {
+    fs.writeFileSync(LOCAL_CATEGORY_WHATSAPP_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving category WhatsApp store:', err);
+  }
+  return merged;
+}
+
+export function saveSingleCategoryWhatsAppNumber(categoryId: string, phone: string): Record<string, string> {
+  const current = getCategoryWhatsAppNumbers();
+  current[categoryId] = (phone || '').trim();
+  try {
+    fs.writeFileSync(LOCAL_CATEGORY_WHATSAPP_FILE, JSON.stringify(current, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving single category WhatsApp number:', err);
+  }
+  return current;
+}
 
 function getLocalConfig(): WhatsAppConfig {
   let config: WhatsAppConfig = {
@@ -309,6 +344,7 @@ export async function dispatchOrderToWhatsAppDepartments(
 
   const categoryEntries = Object.entries(categoryItemsMap);
   const results: SendResult[] = [];
+  const storedCategoryPhones = getCategoryWhatsAppNumbers();
 
   for (const [catId, items] of categoryEntries) {
     // If targetCategoryId is specified, filter for that category only
@@ -316,9 +352,18 @@ export async function dispatchOrderToWhatsAppDepartments(
       continue;
     }
 
-    const categoryObj = categories.find(c => c.id === catId);
-    const categoryName = categoryObj ? categoryObj.name : (catId === 'uncategorized' ? 'قسم عام' : 'قسم غير محدد');
-    const rawPhone = categoryObj?.whatsapp_number || '';
+    const categoryObj = categories.find(c => c.id === catId || c.name === catId);
+    const categoryName = categoryObj ? categoryObj.name : (catId === 'uncategorized' ? 'قسم عام' : catId);
+    
+    // Look up phone from multiple sources (object, id in store, name in store)
+    const rawPhone = (
+      categoryObj?.whatsapp_number ||
+      storedCategoryPhones[catId] ||
+      (categoryObj ? storedCategoryPhones[categoryObj.id] : '') ||
+      (categoryObj ? storedCategoryPhones[categoryObj.name] : '') ||
+      storedCategoryPhones[categoryName] ||
+      ''
+    ).trim();
     const deptTotal = items.reduce((sum, it) => sum + (Number(it.subtotal) || Number(it.price) * Number(it.quantity)), 0);
 
     // Deduplication check: Has this category already been successfully sent for this order?

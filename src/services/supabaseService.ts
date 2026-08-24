@@ -1,6 +1,63 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Category, Product, Order, OrderItem, OrderStatus, WhatsappOrderMessage, WhatsappConfigStatus, VisitorStats } from '../types';
 
+// Category WhatsApp Numbers local & server synchronization cache
+const CATEGORY_WHATSAPP_STORAGE_KEY = 'dz_category_whatsapp_store';
+let categoryWhatsAppCache: Record<string, string> = {};
+
+function initCategoryWhatsAppCache(): Record<string, string> {
+  try {
+    const saved = localStorage.getItem(CATEGORY_WHATSAPP_STORAGE_KEY);
+    if (saved) {
+      categoryWhatsAppCache = { ...categoryWhatsAppCache, ...JSON.parse(saved) };
+    }
+  } catch {}
+  return categoryWhatsAppCache;
+}
+
+// Fetch latest category WhatsApp map from server
+export async function syncCategoryWhatsAppFromServer(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch('/api/category-whatsapp');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.numbers) {
+        categoryWhatsAppCache = { ...categoryWhatsAppCache, ...json.numbers };
+        try {
+          localStorage.setItem(CATEGORY_WHATSAPP_STORAGE_KEY, JSON.stringify(categoryWhatsAppCache));
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn('Could not sync category WhatsApp numbers from server:', err);
+  }
+  return categoryWhatsAppCache;
+}
+
+// Save category WhatsApp number both locally and on server
+export async function saveCategoryWhatsappNumber(categoryId: string, phone: string): Promise<void> {
+  const cleanPhone = (phone || '').trim();
+  categoryWhatsAppCache[categoryId] = cleanPhone;
+
+  try {
+    localStorage.setItem(CATEGORY_WHATSAPP_STORAGE_KEY, JSON.stringify(categoryWhatsAppCache));
+  } catch {}
+
+  try {
+    await fetch('/api/category-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoryId, whatsappNumber: cleanPhone })
+    });
+  } catch (err) {
+    console.error('Failed to post category WhatsApp to server:', err);
+  }
+}
+
+// Initial sync on module load
+initCategoryWhatsAppCache();
+syncCategoryWhatsAppFromServer();
+
 // Category operations
 export async function getCategoriesSupabase(): Promise<Category[]> {
   if (!supabase) return [];
@@ -13,20 +70,36 @@ export async function getCategoriesSupabase(): Promise<Category[]> {
     console.error('Supabase error fetching categories:', error);
     return [];
   }
-  return data as Category[];
+
+  // Ensure latest numbers are synced
+  const cache = categoryWhatsAppCache;
+  const categories = (data as Category[]).map(cat => ({
+    ...cat,
+    whatsapp_number: cache[cat.id] || cache[cat.name] || cat.whatsapp_number || ''
+  }));
+
+  return categories;
 }
 
 export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Category | null> {
   if (!supabase) return null;
   const newId = 'cat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  const whatsappNum = (cat.whatsapp_number || '').trim();
+
   const payload: any = {
     id: newId,
     name: cat.name,
     icon: cat.icon || 'Folder',
     image_url: cat.image_url || '',
-    whatsapp_number: cat.whatsapp_number || '',
+    whatsapp_number: whatsappNum,
     created_at: cat.created_at || new Date().toISOString()
   };
+
+  // Save whatsapp number persistently
+  if (whatsappNum) {
+    saveCategoryWhatsappNumber(newId, whatsappNum);
+    saveCategoryWhatsappNumber(cat.name, whatsappNum);
+  }
 
   let { data, error } = await supabase
     .from('categories')
@@ -50,12 +123,25 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
     console.error('Supabase error adding category:', error);
     throw new Error(error.message);
   }
-  return data as Category;
+
+  return {
+    ...(data as Category),
+    whatsapp_number: whatsappNum
+  };
 }
 
 export async function updateCategorySupabase(id: string, updates: Partial<Category>): Promise<void> {
   if (!supabase) return;
   const payload: any = { ...updates };
+  
+  if (updates.whatsapp_number !== undefined) {
+    const whatsappNum = (updates.whatsapp_number || '').trim();
+    saveCategoryWhatsappNumber(id, whatsappNum);
+    if (updates.name) {
+      saveCategoryWhatsappNumber(updates.name, whatsappNum);
+    }
+  }
+
   let { error } = await supabase
     .from('categories')
     .update(payload)
