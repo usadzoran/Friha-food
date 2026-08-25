@@ -9,7 +9,7 @@ import { CartItem, CustomerInfo } from '../types';
 export function normalizeAlgerianWhatsAppNumber(rawPhone?: string): string {
   if (!rawPhone) return '';
   
-  // Remove all non-digit characters
+  // Remove all non-digit characters (+, -, spaces, etc.)
   let digits = rawPhone.replace(/[^\d]/g, '');
 
   if (!digits) return '';
@@ -33,7 +33,24 @@ export function normalizeAlgerianWhatsAppNumber(rawPhone?: string): string {
 }
 
 /**
- * Generates the clean WhatsApp order text message according to the exact requested format
+ * Generates the clean WhatsApp order text message according to the exact requested format:
+ * 🛎️ طلب جديد
+ *
+ * القسم: Crêperie
+ *
+ * 👤 الزبون: محمد
+ * 📞 الهاتف: 0555123456
+ * 📍 العنوان: وهران
+ *
+ * 🛒 الطلب:
+ *
+ * • Crêpe Nutella × 2
+ * • Crêpe Poulet × 1
+ * • Jus × 2
+ *
+ * 💰 المجموع: 1800 دج
+ *
+ * رقم الطلب: #12345
  */
 export function buildDepartmentWhatsAppMessage(params: {
   orderNumber: string;
@@ -49,7 +66,7 @@ export function buildDepartmentWhatsAppMessage(params: {
     .join('\n');
 
   const notesSection = customer.notes && customer.notes.trim()
-    ? `\n\n📝 ملاحظات:\n${customer.notes.trim()}`
+    ? `\n📝 ملاحظات: ${customer.notes.trim()}`
     : '';
 
   const cleanOrderNum = orderNumber.replace(/^#/, '');
@@ -57,19 +74,14 @@ export function buildDepartmentWhatsAppMessage(params: {
   return (
     `🛎️ طلب جديد\n\n` +
     `القسم: ${categoryName}\n\n` +
-    `👤 اسم الزبون:\n` +
-    `${customer.name.trim()}\n\n` +
-    `📞 الهاتف:\n` +
-    `${customer.phone.trim()}\n\n` +
-    `📍 العنوان:\n` +
-    `${customer.address.trim()}` +
+    `👤 الزبون: ${customer.name.trim()}\n` +
+    `📞 الهاتف: ${customer.phone.trim()}\n` +
+    `📍 العنوان: ${customer.address.trim()}` +
     `${notesSection}\n\n` +
     `🛒 الطلب:\n\n` +
     `${itemsList}\n\n` +
-    `💰 المجموع:\n` +
-    `${totalPrice.toLocaleString('ar-DZ')} دج\n\n` +
-    `رقم الطلب:\n` +
-    `#${cleanOrderNum}`
+    `💰 المجموع: ${totalPrice.toLocaleString('ar-DZ')} دج\n\n` +
+    `رقم الطلب: #${cleanOrderNum}`
   );
 }
 
@@ -91,12 +103,9 @@ export function openWhatsAppDirect(whatsappNumber: string, message: string): str
   const url = buildWhatsAppDirectUrl(whatsappNumber, message);
   if (typeof window !== 'undefined') {
     try {
-      const newWin = window.open(url, '_blank');
-      if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-        window.location.href = url;
-      }
-    } catch {
       window.location.href = url;
+    } catch {
+      window.open(url, '_blank');
     }
   }
   return url;

@@ -431,40 +431,9 @@ export async function deleteDeliveredOrdersSupabase(): Promise<number> {
   return ids.length;
 }
 
-// WhatsApp messages tracking and operations
+// Department WhatsApp direct helpers (No Cloud API / No Serverless calls)
 export async function getWhatsappMessagesSupabase(orderId?: string): Promise<WhatsappOrderMessage[]> {
-  // Try server endpoint first (which checks Supabase and local store fallback)
-  try {
-    const url = orderId ? `/api/whatsapp-messages?order_id=${encodeURIComponent(orderId)}` : '/api/whatsapp-messages';
-    const res = await fetch(url);
-    if (res.ok) {
-      const serverData = await res.json();
-      if (Array.isArray(serverData) && serverData.length > 0) {
-        return serverData;
-      }
-    }
-  } catch {}
-
-  // Direct Supabase query if table exists
-  if (!supabase) return [];
-  try {
-    let query = supabase
-      .from('whatsapp_order_messages')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (orderId) {
-      query = query.eq('order_id', orderId);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      return [];
-    }
-    return (data || []) as WhatsappOrderMessage[];
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 export async function triggerWhatsappOrderDispatch(
@@ -472,36 +441,16 @@ export async function triggerWhatsappOrderDispatch(
   categoryId?: string,
   forceRetry = true
 ): Promise<{ success: boolean; results: any[]; message: string }> {
-  try {
-    const res = await fetch('/api/send-order-whatsapp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        order_id: orderId,
-        category_id: categoryId,
-        force_retry: forceRetry
-      })
-    });
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    return {
-      success: false,
-      results: [],
-      message: err?.message || 'فشل الاتصال بخادم WhatsApp API'
-    };
-  }
+  return {
+    success: true,
+    results: [],
+    message: 'يتم فتح WhatsApp مباشرة عبر الرابط wa.me على هاتف العميل.'
+  };
 }
 
 export async function getWhatsappConfigStatus(): Promise<WhatsappConfigStatus> {
-  try {
-    const res = await fetch('/api/whatsapp-status');
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {}
   return {
-    isConfigured: false,
+    isConfigured: true,
     hasToken: false,
     phoneNumberId: '',
     wabaId: ''
@@ -509,21 +458,11 @@ export async function getWhatsappConfigStatus(): Promise<WhatsappConfigStatus> {
 }
 
 export async function saveWhatsappConfig(config: { phoneNumberId: string; wabaId: string; accessToken: string }) {
-  const res = await fetch('/api/whatsapp-config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config)
-  });
-  return await res.json();
+  return { success: true };
 }
 
 export async function testWhatsappMessage(toPhone: string, message?: string) {
-  const res = await fetch('/api/whatsapp-test', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ toPhone, message })
-  });
-  return await res.json();
+  return { success: true };
 }
 
 // Realtime subscriptions

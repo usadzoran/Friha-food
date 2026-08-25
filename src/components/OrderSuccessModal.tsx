@@ -66,18 +66,18 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
         </div>
 
         {/* Title & Key Notice */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <h2 className="text-xl sm:text-2xl font-black text-slate-800">
-            ✅ تم تجهيز طلبك
+            ✅ تم تجهيز طلبك بنجاح
           </h2>
           
-          <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-right space-y-1.5">
-            <p className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+          <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/90 text-right space-y-1.5 shadow-2xs">
+            <p className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>سيتم فتح WhatsApp لإرسال الطلب إلى المطعم.</span>
+              <span>جاري فتح WhatsApp لإرسال الطلب</span>
             </p>
-            <p className="text-xs text-emerald-800 font-medium leading-relaxed pr-5">
-              اضغط <span className="font-black underline">"إرسال"</span> في تطبيق WhatsApp لتأكيد الإرسال إلى قسم <span className="font-bold">({categoryName})</span>.
+            <p className="text-xs sm:text-sm text-emerald-900 font-bold leading-relaxed pr-5">
+              تم تجهيز الطلب، اضغط <span className="text-emerald-700 font-black underline underline-offset-2">"إرسال"</span> في WhatsApp إلى قسم <span className="font-extrabold text-slate-900">({categoryName})</span>.
             </p>
           </div>
         </div>

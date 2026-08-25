@@ -35,22 +35,26 @@ export const DepartmentConflictModal: React.FC<DepartmentConflictModalProps> = (
         </div>
 
         {/* Title & Message */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h3 className="text-lg sm:text-xl font-black text-slate-800">
-            تنبيه: لا يمكن خلط الأقسام في نفس الطلبية
+            تنبيه: سلة الطلب مرتبطة بقسم واحد فقط
           </h3>
 
-          <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3.5 text-right space-y-2 text-xs sm:text-sm text-slate-700">
-            <p className="font-bold text-amber-900 flex items-start gap-2">
-              <span className="text-amber-600 text-base leading-none">⚠️</span>
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 text-right space-y-2 text-sm text-slate-700">
+            <p className="font-black text-amber-950 text-base flex items-start gap-2">
+              <span className="text-amber-600 text-lg leading-none">⚠️</span>
               <span>
-                لديك طلبية مفتوحة من قسم <span className="font-extrabold text-emerald-800">"{activeCategoryName}"</span>.
+                لديك طلبية مفتوحة من قسم <span className="text-emerald-800 underline underline-offset-4">"{activeCategoryName}"</span>.
               </span>
             </p>
-            <p className="text-slate-600 leading-relaxed pr-6">
-              يرجى إنهاء الطلبية الحالية أولًا قبل إنشاء طلبية من قسم آخر
-              {attemptedCategoryName ? ` (${attemptedCategoryName})` : ''}.
+            <p className="text-amber-900 font-bold leading-relaxed pr-6 text-sm">
+              أنهِي الطلبية الحالية أولًا.
             </p>
+            {attemptedCategoryName && (
+              <p className="text-xs text-slate-500 pt-1 pr-6">
+                (لا يمكن خلط منتجات قسم "{attemptedCategoryName}" مع قسم "{activeCategoryName}" في نفس الطلبية)
+              </p>
+            )}
           </div>
 
           {attemptedProductName && (

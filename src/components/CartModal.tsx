@@ -239,17 +239,17 @@ export const CartModal: React.FC<CartModalProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-base shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-base shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
                       <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      <span>جاري إرسال الطلب...</span>
+                      <span>جاري فتح WhatsApp لإرسال الطلب...</span>
                     </span>
                   ) : (
                     <>
                       <Send className="w-5 h-5" />
-                      <span>تأكيد الطلب الآن</span>
+                      <span>تأكيد الطلب وإرسال عبر WhatsApp</span>
                     </>
                   )}
                 </button>
