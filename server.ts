@@ -11,7 +11,8 @@ import {
   getAllWhatsappMessages,
   getCategoryWhatsAppNumbers,
   saveCategoryWhatsAppNumbers,
-  saveSingleCategoryWhatsAppNumber
+  saveSingleCategoryWhatsAppNumber,
+  createOrderAndDispatchWhatsAppServer
 } from './server/whatsapp';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -99,6 +100,30 @@ async function startServer() {
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // Create Order and Auto-Dispatch to WhatsApp Departments (Server-Side)
+  app.post('/api/orders', async (req, res) => {
+    try {
+      const { customer, items, total_price } = req.body;
+      if (!customer || !customer.name || !customer.phone || !customer.address) {
+        return res.status(400).json({ success: false, error: 'بيانات الزبون (الاسم، الهاتف، العنوان) مطلوبة.' });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, error: 'سلة المشتريات فارغة.' });
+      }
+
+      const result = await createOrderAndDispatchWhatsAppServer({
+        customer,
+        items,
+        total_price
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('Error in POST /api/orders:', err);
+      res.status(500).json({ success: false, error: err?.message || 'فشل إنشاء الطلب وإرساله' });
     }
   });
 

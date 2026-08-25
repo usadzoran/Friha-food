@@ -154,41 +154,9 @@ export function normalizePhoneNumber(raw: string): string {
   return cleaned;
 }
 
-// Format WhatsApp Receipt Message in Arabic for a specific department
-export function formatDepartmentOrderMessage(
-  order: any,
-  deptName: string,
-  deptItems: Array<{ product_name: string; quantity: number; price: number; subtotal: number }>,
-  deptTotal: number
-): string {
-  const displayNum = `DZ-${order.id.slice(-6).toUpperCase()}`;
-
-  const itemsList = deptItems.map(item => {
-    return `▫️ *${item.product_name}*\n   الكمية: ${item.quantity} | السعر: ${item.price.toLocaleString('ar-DZ')} د.ج`;
-  }).join('\n\n');
-
-  return (
-    `🛒 *طلب جديد #${displayNum}*\n` +
-    `🏢 *القسم:* ${deptName}\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `👤 *معلومات الزبون:*\n` +
-    `• *الاسم:* ${order.customer_name}\n` +
-    `• *الهاتف:* ${order.customer_phone}\n` +
-    `• *العنوان:* ${order.customer_address}\n` +
-    (order.notes ? `• *ملاحظات:* ${order.notes}\n` : '') +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `📦 *المنتجات المطلوبة:* \n\n` +
-    `${itemsList}\n\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `💰 *مجموع قسم (${deptName}):* ${deptTotal.toLocaleString('ar-DZ')} د.ج\n` +
-    `💵 *المجموع الإجمالي للطلبية:* ${Number(order.total_price || 0).toLocaleString('ar-DZ')} د.ج\n` +
-    `⏰ *الوقت:* ${new Date(order.created_at || Date.now()).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `_تم إرسال هذا الإشعار تلقائياً من نظام إدارة الطلبات (اشري من دارك)_`
-  );
-}
-
 // Send single message via Meta WhatsApp Cloud API
+const inFlightDispatches = new Set<string>();
+
 export async function sendWhatsAppCloudMessage(
   toPhone: string,
   messageText: string,
@@ -231,20 +199,81 @@ export async function sendWhatsAppCloudMessage(
       body: JSON.stringify(payload)
     });
 
-    const data: any = await response.json();
+    const rawText = await response.text();
+    let data: any = null;
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch (parseErr) {
+      console.error('Invalid WhatsApp API response raw text:', rawText);
+    }
 
     if (!response.ok) {
-      const errorMsg = data?.error?.message || data?.error?.error_user_msg || `Meta API Error (${response.status})`;
-      console.error('Meta WhatsApp Cloud API error:', data);
+      const errorMsg =
+        data?.error?.message ||
+        data?.error?.error_user_msg ||
+        data?.message ||
+        `Meta API Error (${response.status}): ${rawText.slice(0, 150)}`;
+      console.error('Meta WhatsApp Cloud API error response:', data || rawText);
       return { success: false, error: errorMsg };
     }
 
-    const messageId = data?.messages?.[0]?.id || 'wamid_unknown';
+    const messageId = data?.messages?.[0]?.id || 'wamid_success';
     return { success: true, messageId };
   } catch (err: any) {
     console.error('Fetch error sending WhatsApp Cloud API message:', err);
     return { success: false, error: err?.message || 'Network error connecting to Meta WhatsApp API' };
   }
+}
+
+// Format WhatsApp Receipt Message in Arabic for a specific department
+export function formatDepartmentOrderMessage(
+  order: any,
+  deptName: string,
+  deptItems: Array<{ product_name: string; quantity: number; price: number; subtotal: number }>,
+  deptTotal: number,
+  totalCategoryCount: number = 1
+): string {
+  const displayNum = order.id ? `ORD-${order.id.slice(-6).toUpperCase()}` : 'ORD-NEW';
+  const orderTime = new Date(order.created_at || Date.now()).toLocaleTimeString('ar-DZ', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  const itemsList = deptItems
+    .map(item => {
+      const priceFormatted = Number(item.subtotal || item.price * item.quantity).toLocaleString('ar-DZ');
+      return `• ${item.product_name} × ${item.quantity}\n  ${priceFormatted} دج`;
+    })
+    .join('\n\n');
+
+  const notesSection = order.notes && order.notes.trim()
+    ? `\n\n📝 ملاحظات:\n${order.notes.trim()}`
+    : '';
+
+  const totalSummary = totalCategoryCount > 1
+    ? `💰 المجموع الخاص بالقسم: ${deptTotal.toLocaleString('ar-DZ')} دج\n💵 إجمالي كامل الطلبية: ${Number(order.total_price || 0).toLocaleString('ar-DZ')} دج`
+    : `💰 المجموع: ${deptTotal.toLocaleString('ar-DZ')} دج`;
+
+  return (
+    `🛎️ طلب جديد\n\n` +
+    `القسم: ${deptName}\n\n` +
+    `👤 الزبون:\n` +
+    `${order.customer_name}\n\n` +
+    `📞 الهاتف:\n` +
+    `${order.customer_phone}\n\n` +
+    `📍 العنوان:\n` +
+    `${order.customer_address}` +
+    `${notesSection}\n\n` +
+    `🛒 الطلب:\n\n` +
+    `${itemsList}\n\n` +
+    `━━━━━━━━━━━━\n\n` +
+    `${totalSummary}\n\n` +
+    `🕐 وقت الطلب:\n` +
+    `${orderTime}\n\n` +
+    `رقم الطلب:\n` +
+    `#${displayNum}`
+  );
 }
 
 // Process and dispatch an entire order split strictly by category
@@ -345,6 +374,7 @@ export async function dispatchOrderToWhatsAppDepartments(
   const categoryEntries = Object.entries(categoryItemsMap);
   const results: SendResult[] = [];
   const storedCategoryPhones = getCategoryWhatsAppNumbers();
+  const totalCategoryCount = categoryEntries.length;
 
   for (const [catId, items] of categoryEntries) {
     // If targetCategoryId is specified, filter for that category only
@@ -352,102 +382,121 @@ export async function dispatchOrderToWhatsAppDepartments(
       continue;
     }
 
-    const categoryObj = categories.find(c => c.id === catId || c.name === catId);
-    const categoryName = categoryObj ? categoryObj.name : (catId === 'uncategorized' ? 'قسم عام' : catId);
-    
-    // Look up phone from multiple sources (object, id in store, name in store)
-    const rawPhone = (
-      categoryObj?.whatsapp_number ||
-      storedCategoryPhones[catId] ||
-      (categoryObj ? storedCategoryPhones[categoryObj.id] : '') ||
-      (categoryObj ? storedCategoryPhones[categoryObj.name] : '') ||
-      storedCategoryPhones[categoryName] ||
-      ''
-    ).trim();
-    const deptTotal = items.reduce((sum, it) => sum + (Number(it.subtotal) || Number(it.price) * Number(it.quantity)), 0);
-
-    // Deduplication check: Has this category already been successfully sent for this order?
-    const existing = existingMessagesMap[catId];
-    if (existing && existing.status === 'sent' && !options.forceRetry) {
+    const lockKey = `${orderId}:${catId}`;
+    if (inFlightDispatches.has(lockKey)) {
+      console.log(`[WhatsApp] Dispatch already in flight for ${lockKey}, skipping duplicate.`);
       results.push({
         categoryId: catId,
-        categoryName,
-        whatsappNumber: rawPhone,
+        categoryName: catId,
+        whatsappNumber: '',
         status: 'skipped',
-        messageId: existing.provider_message_id,
-        errorMessage: 'تم إرسال هذا الطلب لهذا القسم سابقاً بنجاح (تم التخطي لمنع التكرار).'
+        errorMessage: 'جاري إرسال الطلب بالفعل لهذا القسم حالياً.'
       });
       continue;
     }
 
-    const messageText = formatDepartmentOrderMessage(order, categoryName, items, deptTotal);
-    const msgId = 'wamsg_' + orderId + '_' + catId + '_' + Date.now();
-    const now = new Date().toISOString();
+    inFlightDispatches.add(lockKey);
 
-    if (!rawPhone || !rawPhone.trim()) {
-      const errorMsg = `لا يوجد رقم WhatsApp مخصص لقسم "${categoryName}". يرجى إضافة الرقم في لوحة التحكم.`;
+    try {
+      const categoryObj = categories.find(c => c.id === catId || c.name === catId);
+      const categoryName = categoryObj ? categoryObj.name : (catId === 'uncategorized' ? 'قسم عام' : catId);
       
+      // Look up phone from multiple sources (object, id in store, name in store)
+      const rawPhone = (
+        categoryObj?.whatsapp_number ||
+        storedCategoryPhones[catId] ||
+        (categoryObj ? storedCategoryPhones[categoryObj.id] : '') ||
+        (categoryObj ? storedCategoryPhones[categoryObj.name] : '') ||
+        storedCategoryPhones[categoryName] ||
+        ''
+      ).trim();
+      const deptTotal = items.reduce((sum, it) => sum + (Number(it.subtotal) || Number(it.price) * Number(it.quantity)), 0);
+
+      // Deduplication check: Has this category already been successfully sent for this order?
+      const existing = existingMessagesMap[catId];
+      if (existing && existing.status === 'sent' && !options.forceRetry) {
+        results.push({
+          categoryId: catId,
+          categoryName,
+          whatsappNumber: rawPhone,
+          status: 'skipped',
+          messageId: existing.provider_message_id,
+          errorMessage: 'تم إرسال هذا الطلب لهذا القسم سابقاً بنجاح (تم التخطي لمنع التكرار).'
+        });
+        continue;
+      }
+
+      const messageText = formatDepartmentOrderMessage(order, categoryName, items, deptTotal, totalCategoryCount);
+      const msgId = 'wamsg_' + orderId + '_' + catId + '_' + Date.now();
+      const now = new Date().toISOString();
+
+      if (!rawPhone || !rawPhone.trim()) {
+        const errorMsg = `لا يوجد رقم WhatsApp مخصص لقسم "${categoryName}". يرجى إضافة الرقم في لوحة التحكم.`;
+        
+        const recordPayload = {
+          id: msgId,
+          order_id: orderId,
+          category_id: catId,
+          whatsapp_number: '',
+          message: messageText,
+          status: 'failed',
+          error_message: errorMsg,
+          created_at: now
+        };
+
+        if (supabase) {
+          await supabase.from('whatsapp_order_messages').upsert([recordPayload], { onConflict: 'id' }).select();
+        }
+        saveLocalMessage(recordPayload);
+
+        results.push({
+          categoryId: catId,
+          categoryName,
+          whatsappNumber: '',
+          status: 'failed',
+          errorMessage: errorMsg,
+          messageText
+        });
+        continue;
+      }
+
+      // Call Meta WhatsApp Cloud API
+      const apiResult = await sendWhatsAppCloudMessage(rawPhone, messageText, config);
+
       const recordPayload = {
         id: msgId,
         order_id: orderId,
         category_id: catId,
-        whatsapp_number: '',
+        whatsapp_number: normalizePhoneNumber(rawPhone),
         message: messageText,
-        status: 'failed',
-        error_message: errorMsg,
+        status: apiResult.success ? 'sent' : 'failed',
+        provider_message_id: apiResult.messageId || null,
+        error_message: apiResult.error || null,
+        sent_at: apiResult.success ? now : null,
         created_at: now
       };
 
       if (supabase) {
-        await supabase.from('whatsapp_order_messages').upsert([recordPayload], { onConflict: 'id' }).select();
+        try {
+          await supabase.from('whatsapp_order_messages').upsert([recordPayload], { onConflict: 'id' }).select();
+        } catch (dbErr) {
+          console.warn('Could not insert to supabase whatsapp_order_messages, saving locally:', dbErr);
+        }
       }
       saveLocalMessage(recordPayload);
 
       results.push({
         categoryId: catId,
         categoryName,
-        whatsappNumber: '',
-        status: 'failed',
-        errorMessage: errorMsg,
+        whatsappNumber: rawPhone,
+        status: apiResult.success ? 'sent' : 'failed',
+        messageId: apiResult.messageId,
+        errorMessage: apiResult.error,
         messageText
       });
-      continue;
+    } finally {
+      inFlightDispatches.delete(lockKey);
     }
-
-    // Call Meta WhatsApp Cloud API
-    const apiResult = await sendWhatsAppCloudMessage(rawPhone, messageText, config);
-
-    const recordPayload = {
-      id: msgId,
-      order_id: orderId,
-      category_id: catId,
-      whatsapp_number: normalizePhoneNumber(rawPhone),
-      message: messageText,
-      status: apiResult.success ? 'sent' : 'failed',
-      provider_message_id: apiResult.messageId || null,
-      error_message: apiResult.error || null,
-      sent_at: apiResult.success ? now : null,
-      created_at: now
-    };
-
-    if (supabase) {
-      try {
-        await supabase.from('whatsapp_order_messages').upsert([recordPayload], { onConflict: 'id' }).select();
-      } catch (dbErr) {
-        console.warn('Could not insert to supabase whatsapp_order_messages, saving locally:', dbErr);
-      }
-    }
-    saveLocalMessage(recordPayload);
-
-    results.push({
-      categoryId: catId,
-      categoryName,
-      whatsappNumber: rawPhone,
-      status: apiResult.success ? 'sent' : 'failed',
-      messageId: apiResult.messageId,
-      errorMessage: apiResult.error,
-      messageText
-    });
   }
 
   const allSuccess = results.every(r => r.status === 'sent' || r.status === 'skipped');
@@ -464,4 +513,68 @@ export function getAllWhatsappMessages(orderId?: string) {
     return localList.filter(m => m.order_id === orderId);
   }
   return localList;
+}
+
+// Server-Side Complete Order Creation and Automated WhatsApp Dispatch
+export async function createOrderAndDispatchWhatsAppServer(payload: {
+  customer: { name: string; phone: string; address: string; notes?: string };
+  items: Array<{ product_id: string; product_name: string; price: number; quantity: number; category_id?: string; subtotal?: number }>;
+  total_price?: number;
+}): Promise<{
+  success: boolean;
+  orderId: string;
+  displayOrderNum: string;
+  whatsapp: { success: boolean; results: SendResult[]; message: string };
+}> {
+  const supabase = getSupabaseClient();
+  const orderId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  const now = new Date().toISOString();
+  const displayOrderNum = `DZ-${orderId.slice(-6).toUpperCase()}`;
+
+  const calcTotal = payload.total_price !== undefined
+    ? Number(payload.total_price)
+    : payload.items.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
+
+  const orderRecord = {
+    id: orderId,
+    customer_name: (payload.customer.name || '').trim(),
+    customer_phone: (payload.customer.phone || '').trim(),
+    customer_address: (payload.customer.address || '').trim(),
+    notes: (payload.customer.notes || '').trim(),
+    status: 'pending',
+    total_price: calcTotal,
+    created_at: now,
+    updated_at: now
+  };
+
+  const orderItemsRecords = payload.items.map(it => ({
+    id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    order_id: orderId,
+    product_id: it.product_id,
+    product_name: it.product_name,
+    price: it.price,
+    quantity: it.quantity,
+    subtotal: it.subtotal || (it.price * it.quantity)
+  }));
+
+  if (supabase) {
+    const { error: ordErr } = await supabase.from('orders').insert([orderRecord]);
+    if (ordErr) {
+      console.error('Supabase error inserting order on server:', ordErr);
+    }
+    const { error: itemsErr } = await supabase.from('order_items').insert(orderItemsRecords);
+    if (itemsErr) {
+      console.error('Supabase error inserting order items on server:', itemsErr);
+    }
+  }
+
+  // Automatically dispatch to all departments via WhatsApp Cloud API
+  const dispatchResult = await dispatchOrderToWhatsAppDepartments(orderId);
+
+  return {
+    success: true,
+    orderId,
+    displayOrderNum,
+    whatsapp: dispatchResult
+  };
 }

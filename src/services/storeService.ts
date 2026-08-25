@@ -463,9 +463,51 @@ export async function toggleProductActive(id: string, currentActive: boolean): P
 export async function createOrder(
   customer: CustomerInfo,
   cartItems: CartItem[]
-): Promise<{ orderId: string; displayOrderNum: string }> {
+): Promise<{ orderId: string; displayOrderNum: string; whatsapp?: any }> {
+  const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+
+  // 1. Primary path: Call Server-Side API for Order Creation + Instant WhatsApp Department Dispatch
+  try {
+    const payload = {
+      customer: {
+        name: customer.name.trim(),
+        phone: customer.phone.trim(),
+        address: customer.address.trim(),
+        notes: customer.notes.trim()
+      },
+      items: cartItems.map(ci => ({
+        product_id: ci.product.id,
+        product_name: ci.product.name,
+        price: ci.product.price,
+        quantity: ci.quantity,
+        category_id: ci.product.category_id,
+        subtotal: ci.product.price * ci.quantity
+      })),
+      total_price: totalPrice
+    };
+
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.orderId) {
+        return {
+          orderId: data.orderId,
+          displayOrderNum: data.displayOrderNum || `DZ-${data.orderId.slice(-6).toUpperCase()}`,
+          whatsapp: data.whatsapp
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Server /api/orders route not available or error, falling back to direct DB client:', apiErr);
+  }
+
+  // 2. Fallback path: Direct Supabase creation + background trigger
   if (isSupabaseConfigured()) {
-    const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const orderId = await createOrderSupabase(
       {
         customer_name: customer.name.trim(),
@@ -480,11 +522,10 @@ export async function createOrder(
     return { orderId, displayOrderNum };
   }
 
+  // 3. Fallback path: Firestore
   try {
-    const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const now = new Date().toISOString();
 
-    // 1. Create order document
     const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), {
       customer_name: customer.name.trim(),
       customer_phone: customer.phone.trim(),
@@ -499,7 +540,6 @@ export async function createOrder(
     const orderId = orderRef.id;
     const displayOrderNum = `DZ-${orderId.slice(-6).toUpperCase()}`;
 
-    // 2. Create order_items documents (preserving price snapshot)
     const batch = writeBatch(db);
     for (const item of cartItems) {
       const itemRef = doc(collection(db, ORDER_ITEMS_COLLECTION));
