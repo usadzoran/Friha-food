@@ -71,7 +71,10 @@ import {
   HelpCircle,
   Copy,
   Smartphone,
-  Megaphone
+  Megaphone,
+  FileCode,
+  Layout,
+  Code2
 } from 'lucide-react';
 import { playOrderNotificationSound, requestBrowserNotificationPermission } from '../../utils/notificationSound';
 
@@ -729,43 +732,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="bg-slate-100 min-h-screen pb-12">
       {/* Admin Navigation Bar */}
       <div className="bg-slate-900 text-white shadow-md border-b border-slate-800 sticky top-14 z-20">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1 sm:gap-2 py-2">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
+          
+          {/* Mobile Tab Select Dropdown for Easy Access on Small Screens */}
+          <div className="sm:hidden mb-2">
+            <div className="relative">
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as AdminTab)}
+                aria-label="اختر قسم الإدارة"
+                className="w-full bg-slate-800 text-white font-bold text-xs py-2.5 px-3 rounded-xl border border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 appearance-none text-right"
+              >
+                <option value="dashboard">📊 لوحة التحكم الرئيسية</option>
+                <option value="ads">📢 إدارة الإعلانات وبنرات HTML ({ads.filter(a => a.is_active).length} نشط)</option>
+                <option value="products">📦 المنتجات ({products.length})</option>
+                <option value="categories">🗂️ الأقسام ({categories.length})</option>
+                <option value="current_orders">⏳ الطلبات الحالية ({currentOrders.length})</option>
+                <option value="order_history">📜 سجل الطلبات ({historicOrders.length})</option>
+                <option value="visitors">👥 زوار الموقع ({visitorStats?.today_visits || 0} اليوم)</option>
+                <option value="whatsapp_settings">💬 إعدادات WhatsApp API</option>
+              </select>
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                ▼
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop & Scrollable Tablet Tabs */}
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin scrollbar-thumb-slate-700">
             
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 activeTab === 'dashboard'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <LayoutDashboard className="w-4 h-4 text-emerald-400" />
               <span>الرئيسية</span>
             </button>
 
+            {/* Prominent Ads Tab */}
             <button
-              onClick={() => setActiveTab('visitors')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === 'visitors'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-slate-800'
+              onClick={() => setActiveTab('ads')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
+                activeTab === 'ads'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
+                  : 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
               }`}
             >
-              <Users className="w-4 h-4" />
-              <span>زوار الموقع</span>
-              {visitorStats?.today_visits ? (
-                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
-                  {visitorStats.today_visits}
+              <Megaphone className="w-4 h-4 text-amber-400 animate-pulse" />
+              <span>الإعلانات (HTML)</span>
+              {ads.filter(a => a.is_active).length > 0 ? (
+                <span className="bg-amber-400 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+                  {ads.filter(a => a.is_active).length} نشط
                 </span>
-              ) : null}
+              ) : (
+                <span className="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                  {ads.length}
+                </span>
+              )}
             </button>
 
             <button
               onClick={() => setActiveTab('products')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 activeTab === 'products'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
@@ -775,9 +809,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               onClick={() => setActiveTab('categories')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 activeTab === 'categories'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
@@ -787,9 +821,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               onClick={() => setActiveTab('current_orders')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap relative ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 relative ${
                 activeTab === 'current_orders'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
@@ -804,9 +838,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               onClick={() => setActiveTab('order_history')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 activeTab === 'order_history'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
@@ -815,36 +849,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('ads')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === 'ads'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+              onClick={() => setActiveTab('visitors')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
+                activeTab === 'visitors'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
-              <Megaphone className="w-4 h-4 text-emerald-400" />
-              <span>الإعلانات (HTML)</span>
-              {ads.filter(a => a.is_active).length > 0 ? (
-                <span className="bg-emerald-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-black">
-                  {ads.filter(a => a.is_active).length} نشط
+              <Users className="w-4 h-4" />
+              <span>زوار الموقع</span>
+              {visitorStats?.today_visits ? (
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                  {visitorStats.today_visits}
                 </span>
-              ) : (
-                <span className="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                  {ads.length}
-                </span>
-              )}
+              ) : null}
             </button>
 
             <button
               onClick={() => setActiveTab('whatsapp_settings')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 activeTab === 'whatsapp_settings'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
               <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>إعدادات WhatsApp API</span>
+              <span>WhatsApp API</span>
               {whatsappConfigStatus.isConfigured ? (
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               ) : (
@@ -858,7 +888,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onClick={handleRestoreDefaultData}
               disabled={isRestoring}
               title="استرجاع الأقسام والمنتجات الأصلية في حالة اختفائها"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 mr-auto disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 mr-auto disabled:opacity-50"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${isRestoring ? 'animate-spin' : ''}`} />
               <span>{isRestoring ? 'جاري الاسترجاع...' : 'استرجاع البيانات'}</span>
@@ -1115,8 +1145,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
+            {/* Ads & HTML Banners Overview Card */}
+            <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-indigo-500/40 relative overflow-hidden space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/60 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-lg">
+                    <Megaphone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-white">قسم إدارة الإعلانات وبنرات HTML</h3>
+                      {ads.filter(a => a.is_active).length > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span>{ads.filter(a => a.is_active).length} إعلانات مفعّلة ونشطة</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <span>لا توجد إعلانات نشطة</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      تحكم كامل بظهور أكواد Google AdSense، البنرات الترويجية، روابط الإحالة والنوافذ المنبثقة
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('ads')}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+                  >
+                    <Megaphone className="w-4 h-4 text-amber-300" />
+                    <span>فتح قسم الإعلانات بالكامل</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Ads Placements Quick Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>إجمالي الإعلانات</span>
+                    <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-xl font-black text-white">{ads.length}</div>
+                  <p className="text-[10px] text-slate-400 font-medium">في قاعدة البيانات</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-emerald-400 text-xs font-bold">
+                    <span>الإعلانات النشطة</span>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="text-xl font-black text-emerald-300">{ads.filter(a => a.is_active).length}</div>
+                  <p className="text-[10px] text-emerald-400/80 font-medium">تظهر للزوار حالياً</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-blue-400 text-xs font-bold">
+                    <span>أماكن الظهور</span>
+                    <Layout className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <div className="text-xl font-black text-blue-300">9 مواضع</div>
+                  <p className="text-[10px] text-slate-400 font-medium">أعلى، بنرات، سلة، منبثق</p>
+                </div>
+
+                <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 space-y-1">
+                  <div className="flex items-center justify-between text-purple-400 text-xs font-bold">
+                    <span>دعم AdSense & HTML</span>
+                    <Code2 className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                  <div className="text-xl font-black text-purple-300">فوري ومباشر</div>
+                  <p className="text-[10px] text-slate-400 font-medium">مع قوالب جاهزة</p>
+                </div>
+              </div>
+            </div>
+
             {/* Quick Action Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm">إدارة وإضافة المنتجات</h3>
@@ -1142,6 +1250,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   <FolderPlus className="w-4 h-4" />
                   <span>قسم جديد</span>
+                </button>
+              </div>
+
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-5 rounded-2xl border border-emerald-200 shadow-xs flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-emerald-950 text-sm">إدارة الإعلانات وبنرات HTML</h3>
+                  <p className="text-xs text-emerald-700 mt-0.5">إضافة أكواد AdSense أو بنرات دعائية مخصصة</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('ads')}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0 flex items-center gap-1.5"
+                >
+                  <Megaphone className="w-4 h-4 text-amber-300" />
+                  <span>الإعلانات</span>
                 </button>
               </div>
             </div>
