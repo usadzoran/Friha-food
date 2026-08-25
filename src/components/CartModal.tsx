@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { CartItem, CustomerInfo } from '../types';
+import { CartItem, CustomerInfo, AdSlot } from '../types';
 import { X, Trash2, Plus, Minus, ShoppingBag, Send, AlertCircle } from 'lucide-react';
+import { AdRenderer } from './AdRenderer';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface CartModalProps {
   onRemoveItem: (productId: string) => void;
   onSubmitOrder: (customer: CustomerInfo) => Promise<void>;
   isSubmitting: boolean;
+  ads?: AdSlot[];
 }
 
 export const CartModal: React.FC<CartModalProps> = ({
@@ -19,7 +21,8 @@ export const CartModal: React.FC<CartModalProps> = ({
   onUpdateQuantity,
   onRemoveItem,
   onSubmitOrder,
-  isSubmitting
+  isSubmitting,
+  ads = []
 }) => {
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: '',
@@ -250,6 +253,8 @@ export const CartModal: React.FC<CartModalProps> = ({
                     </>
                   )}
                 </button>
+                {/* Ad in Cart Modal */}
+                <AdRenderer placement="cart_modal_bottom" ads={ads} className="pt-2" />
               </form>
             </>
           )}

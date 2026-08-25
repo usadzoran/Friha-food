@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats, WhatsappOrderMessage, WhatsappConfigStatus } from '../../types';
+import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats, WhatsappOrderMessage, WhatsappConfigStatus, AdSlot } from '../../types';
 import { 
   addProduct, 
   updateProduct, 
@@ -17,8 +17,10 @@ import {
   triggerWhatsappOrderDispatch,
   getWhatsappConfigStatus,
   saveWhatsappConfig,
-  testWhatsappMessage
+  testWhatsappMessage,
+  subscribeToAds
 } from '../../services/storeService';
+import { AdsManagerTab } from './AdsManagerTab';
 import { 
   LayoutDashboard, 
   Package, 
@@ -68,7 +70,8 @@ import {
   CheckCircle2,
   HelpCircle,
   Copy,
-  Smartphone
+  Smartphone,
+  Megaphone
 } from 'lucide-react';
 import { playOrderNotificationSound, requestBrowserNotificationPermission } from '../../utils/notificationSound';
 
@@ -212,6 +215,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [configNotice, setConfigNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Ads State
+  const [ads, setAds] = useState<AdSlot[]>([]);
+
   // Live WhatsApp Test State
   const [testRecipientPhone, setTestRecipientPhone] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -230,8 +236,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const unsubscribe = subscribeToWhatsappMessagesSupabase((msgs) => {
       setWhatsappMessages(msgs);
     });
+    const unsubscribeAds = subscribeToAds((adItems) => {
+      setAds(adItems);
+    });
     return () => {
       unsubscribe();
+      unsubscribeAds();
     };
   }, []);
 
@@ -802,6 +812,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <History className="w-4 h-4" />
               <span>سجل الطلبات ({historicOrders.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ads')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                activeTab === 'ads'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Megaphone className="w-4 h-4 text-emerald-400" />
+              <span>الإعلانات (HTML)</span>
+              {ads.filter(a => a.is_active).length > 0 ? (
+                <span className="bg-emerald-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+                  {ads.filter(a => a.is_active).length} نشط
+                </span>
+              ) : (
+                <span className="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                  {ads.length}
+                </span>
+              )}
             </button>
 
             <button
@@ -2210,6 +2241,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             </div>
           </div>
+        )}
+
+        {/* TAB: ADS & HTML MANAGEMENT */}
+        {activeTab === 'ads' && (
+          <AdsManagerTab ads={ads} />
         )}
 
       </div>

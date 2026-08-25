@@ -1,11 +1,12 @@
 import React from 'react';
 import { CheckCircle2, ShoppingBag, MessageSquare, ExternalLink, ArrowLeft } from 'lucide-react';
-import { CartItem, Category, CustomerInfo } from '../types';
+import { CartItem, Category, CustomerInfo, AdSlot } from '../types';
 import { 
   buildDepartmentWhatsAppMessage, 
   buildWhatsAppDirectUrl, 
   openWhatsAppDirect 
 } from '../utils/whatsappOrder';
+import { AdRenderer } from './AdRenderer';
 
 interface OrderSuccessModalProps {
   orderNumber: string | null;
@@ -13,6 +14,7 @@ interface OrderSuccessModalProps {
   customer?: CustomerInfo;
   orderedItems?: CartItem[];
   categories?: Category[];
+  ads?: AdSlot[];
 }
 
 export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
@@ -20,7 +22,8 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
   onClose,
   customer,
   orderedItems = [],
-  categories = []
+  categories = [],
+  ads = []
 }) => {
   if (!orderNumber) return null;
 
@@ -132,6 +135,9 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
             <span>فتح WhatsApp وتأكيد الإرسال</span>
             <ExternalLink className="w-4 h-4 text-emerald-200" />
           </a>
+
+          {/* Ad Slot on Order Success */}
+          <AdRenderer placement="order_success" ads={ads} className="pt-2" />
 
           {/* Close / Start New Order */}
           <button

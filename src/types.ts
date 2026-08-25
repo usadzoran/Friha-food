@@ -69,7 +69,29 @@ export interface VisitorStats {
   daily_history?: DailyVisit[];
 }
 
-export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history' | 'whatsapp_settings';
+export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history' | 'ads' | 'whatsapp_settings';
+
+export type AdPlacement = 
+  | 'header_top' 
+  | 'home_banner' 
+  | 'product_grid_middle' 
+  | 'product_details_modal' 
+  | 'cart_modal_bottom' 
+  | 'order_success' 
+  | 'sidebar_or_footer' 
+  | 'popup_ad' 
+  | 'custom_head_script';
+
+export interface AdSlot {
+  id: string;
+  title: string;
+  placement: AdPlacement;
+  html_code: string;
+  is_active: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export type WhatsappMessageStatus = 'pending' | 'sent' | 'failed';
 

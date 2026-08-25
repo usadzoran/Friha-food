@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Category, Product, Order, OrderItem, OrderStatus, WhatsappOrderMessage, WhatsappConfigStatus, VisitorStats } from '../types';
+import { Category, Product, Order, OrderItem, OrderStatus, WhatsappOrderMessage, WhatsappConfigStatus, VisitorStats, AdSlot } from '../types';
 
 // Category WhatsApp Numbers local & server synchronization cache
 const CATEGORY_WHATSAPP_STORAGE_KEY = 'dz_category_whatsapp_store';
@@ -718,4 +718,218 @@ export function subscribeToVisitorStatsSupabase(onUpdate: (stats: VisitorStats) 
     visitorListeners.delete(onUpdate);
   };
 }
+
+// ----------------------------------------------------
+// ADS STORAGE & REALTIME MANAGEMENT (HTML Ad Units)
+// ----------------------------------------------------
+const ADS_STORAGE_KEY = 'dz_store_custom_ads';
+const adListeners: Set<(ads: AdSlot[]) => void> = new Set();
+
+export const DEFAULT_INITIAL_ADS: AdSlot[] = [
+  {
+    id: 'ad_header_top_1',
+    title: 'إعلان بانر أعلى الموقع (Header Banner)',
+    placement: 'header_top',
+    html_code: `<div style="background: linear-gradient(90deg, #065f46 0%, #047857 100%); color: #ffffff; text-align: center; padding: 10px 16px; border-radius: 12px; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+  <span>🎉 تخفيضات حصرية وعروض خاصة بمناسبة الموسم! اطلب الآن مع توصيل سريع لجميع الولايات.</span>
+</div>`,
+    is_active: false,
+    notes: 'يظهر في أعلى الصفحة لجميع الزوار',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_home_middle_2',
+    title: 'إعلان رئيسي بين الأقسام والمنتجات (Home Banner)',
+    placement: 'home_banner',
+    html_code: `<div style="background: #ffffff; border: 1px dashed #10b981; padding: 14px; border-radius: 16px; text-align: center;">
+  <p style="margin: 0 0 6px 0; font-size: 14px; font-weight: 800; color: #065f46;">مساحة إعلانية مخصصة</p>
+  <p style="margin: 0; font-size: 12px; color: #64748b;">يمكنك الصاق كود إعلانك (Google AdSense أو بانر أو كود HTML) من لوحة تحكم الأدمن في أي وقت.</p>
+</div>`,
+    is_active: false,
+    notes: 'يظهر في الصفحة الرئيسية بين الأقسام وقائمة المنتجات',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_product_grid_3',
+    title: 'إعلان وسط شبكة المنتجات (Product Grid Slot)',
+    placement: 'product_grid_middle',
+    html_code: `<div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 20px; padding: 20px; text-align: center; display: flex; flex-direction: column; items-center; justify-content: center; min-height: 260px;">
+  <span style="font-size: 24px; margin-bottom: 8px;">📢</span>
+  <h4 style="margin: 0 0 4px; font-weight: 800; font-size: 14px; color: #334155;">مساحة إعلانية ترويجية</h4>
+  <p style="margin: 0; font-size: 11px; color: #64748b;">ضع هنا كود إعلانات AdSense أو راعي ترويجي يظهر وسط المنتجات.</p>
+</div>`,
+    is_active: false,
+    notes: 'يظهر كبطاقة إعلانية جذابة بين بطاقات المنتجات في المتجر',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_footer_bottom_4',
+    title: 'إعلان أسفل الموقع قبل الفوتر (Bottom Banner)',
+    placement: 'sidebar_or_footer',
+    html_code: `<div style="background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 16px; text-align: center; font-size: 13px;">
+  <strong style="color: #34d399;">🚚 توصيل مضمون وسريع</strong> إلى باب منزلك مع إمكانية الدفع عند الاستلام والتأكد من الطلبية.
+</div>`,
+    is_active: false,
+    notes: 'يظهر قبل نهاية الصفحة وفوق الفوتر',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_cart_modal_5',
+    title: 'إعلان داخل نافذة سلة المشتريات (Cart Ad)',
+    placement: 'cart_modal_bottom',
+    html_code: `<div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px; text-align: center; font-size: 12px; color: #065f46; font-weight: bold;">
+  💡 ملاحظة: يتم تأكيد الطلبيات بسرعة عبر واتساب مباشرة مع خدمة الزبائن.
+</div>`,
+    is_active: false,
+    notes: 'يظهر للزبون أثناء استعراض سلة المشتريات وإتمام الطلب',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_order_success_6',
+    title: 'إعلان صفحة تأكيد واستلام الطلب (Success Screen Ad)',
+    placement: 'order_success',
+    html_code: `<div style="background: #f0fdf4; border: 1px dashed #22c55e; border-radius: 14px; padding: 12px; text-align: center; font-size: 12px; color: #15803d;">
+  🌟 شكراً لثقتكم بنا! تابعوا عروضنا الأسبوعية المتجددة.
+</div>`,
+    is_active: false,
+    notes: 'يظهر للزبون بعد إرسال وتأكيد الطلبية مباشرة',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_popup_7',
+    title: 'إعلان نافذة منبثقة عائمة (Popup Banner)',
+    placement: 'popup_ad',
+    html_code: `<div style="text-align: center; padding: 10px;">
+  <h3 style="margin: 0 0 6px; font-weight: 800; font-size: 16px; color: #0f172a;">🔥 عرض ترويجي خاص!</h3>
+  <p style="margin: 0; font-size: 13px; color: #475569;">احصل على أفضل المنتجات الطبيعية والتقليدية مع توصيل سريع لجميع الولايات.</p>
+</div>`,
+    is_active: false,
+    notes: 'إعلان يطفو في زاوية الشاشة أو كنافذة منبثقة مع زر إغلاق سهل',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'ad_global_head_8',
+    title: 'كود إعلانات عام (Header / Global Script / AdSense Auto)',
+    placement: 'custom_head_script',
+    html_code: `<!-- الصق هنا كود Google AdSense أو أكواد التتبع والإعلانات التلقائية -->`,
+    is_active: false,
+    notes: 'كود جافاسكريبت أو HTML عام يعمل في خلفية الموقع',
+    created_at: new Date().toISOString()
+  }
+];
+
+function getStoredAds(): AdSlot[] {
+  try {
+    const raw = localStorage.getItem(ADS_STORAGE_KEY);
+    if (raw) {
+      const parsed: AdSlot[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [...DEFAULT_INITIAL_ADS];
+}
+
+function notifyAdListeners(ads: AdSlot[]) {
+  adListeners.forEach(listener => {
+    try {
+      listener(ads);
+    } catch {}
+  });
+}
+
+export async function getAdsSupabase(): Promise<AdSlot[]> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data as AdSlot[];
+      }
+    } catch {}
+  }
+  return getStoredAds();
+}
+
+export async function saveAdSupabase(ad: Omit<AdSlot, 'id'> & { id?: string }): Promise<AdSlot> {
+  const current = getStoredAds();
+  const id = ad.id || `ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const nowIso = new Date().toISOString();
+
+  const adSlot: AdSlot = {
+    id,
+    title: ad.title.trim(),
+    placement: ad.placement,
+    html_code: ad.html_code || '',
+    is_active: Boolean(ad.is_active),
+    notes: ad.notes || '',
+    created_at: ad.created_at || nowIso,
+    updated_at: nowIso
+  };
+
+  const existingIdx = current.findIndex(a => a.id === id);
+  let updated: AdSlot[];
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = adSlot;
+  } else {
+    updated = [...current, adSlot];
+  }
+
+  localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(updated));
+  notifyAdListeners(updated);
+
+  if (supabase) {
+    try {
+      await supabase.from('ads').upsert(adSlot);
+    } catch {}
+  }
+
+  return adSlot;
+}
+
+export async function deleteAdSupabase(id: string): Promise<void> {
+  const current = getStoredAds();
+  const filtered = current.filter(a => a.id !== id);
+  localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(filtered));
+  notifyAdListeners(filtered);
+
+  if (supabase) {
+    try {
+      await supabase.from('ads').delete().eq('id', id);
+    } catch {}
+  }
+}
+
+export async function toggleAdSupabase(id: string, is_active: boolean): Promise<void> {
+  const current = getStoredAds();
+  const updated = current.map(a => a.id === id ? { ...a, is_active, updated_at: new Date().toISOString() } : a);
+  localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(updated));
+  notifyAdListeners(updated);
+
+  if (supabase) {
+    try {
+      await supabase.from('ads').update({ is_active }).eq('id', id);
+    } catch {}
+  }
+}
+
+export function subscribeToAdsSupabase(onUpdate: (ads: AdSlot[]) => void) {
+  const initial = getStoredAds();
+  onUpdate(initial);
+  adListeners.add(onUpdate);
+
+  if (supabase) {
+    getAdsSupabase().then(onUpdate);
+  }
+
+  return () => {
+    adListeners.delete(onUpdate);
+  };
+}
+
 

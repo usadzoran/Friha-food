@@ -40,14 +40,21 @@ import {
   trackSiteVisitSupabase,
   subscribeToVisitorStatsSupabase,
   saveCategoryWhatsappNumber,
-  syncCategoryWhatsAppFromServer
+  syncCategoryWhatsAppFromServer,
+  getAdsSupabase,
+  saveAdSupabase,
+  deleteAdSupabase,
+  toggleAdSupabase,
+  subscribeToAdsSupabase,
+  DEFAULT_INITIAL_ADS
 } from './supabaseService';
-import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats } from '../types';
+import { Category, Product, Order, OrderItem, OrderStatus, CustomerInfo, CartItem, VisitorStats, AdSlot } from '../types';
 
 const PRODUCTS_COLLECTION = 'products';
 const CATEGORIES_COLLECTION = 'categories';
 const ORDERS_COLLECTION = 'orders';
 const ORDER_ITEMS_COLLECTION = 'order_items';
+const ADS_COLLECTION = 'ads';
 
 const INITIAL_CATEGORIES: Omit<Category, 'id'>[] = [
   { name: 'المأكولات والتمور', icon: 'Utensils', image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80', created_at: new Date().toISOString() },
@@ -756,6 +763,98 @@ export function subscribeToVisitorStats(onUpdate: (stats: VisitorStats) => void)
   }
 }
 
+// ----------------------------------------------------
+// ADS MANAGEMENT (HTML & SCRIPT AD SLOTS)
+// ----------------------------------------------------
+
+export async function getAds(): Promise<AdSlot[]> {
+  try {
+    const snap = await getDocs(collection(db, ADS_COLLECTION));
+    if (!snap.empty) {
+      const items: AdSlot[] = [];
+      snap.forEach((d) => {
+        items.push({ id: d.id, ...d.data() } as AdSlot);
+      });
+      return items;
+    }
+  } catch (err) {
+    console.warn('Firestore getAds falling back to local/supabase:', err);
+  }
+  return getAdsSupabase();
+}
+
+export function subscribeToAds(onUpdate: (ads: AdSlot[]) => void): () => void {
+  try {
+    const q = query(collection(db, ADS_COLLECTION));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const adsList: AdSlot[] = [];
+          snapshot.forEach((docSnap) => {
+            adsList.push({ id: docSnap.id, ...docSnap.data() } as AdSlot);
+          });
+          onUpdate(adsList);
+        } else {
+          // If Firestore is empty, initialize with defaults
+          onUpdate(DEFAULT_INITIAL_ADS);
+        }
+      },
+      (error) => {
+        console.warn('Firestore subscribeToAds listener fallback:', error);
+        subscribeToAdsSupabase(onUpdate);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn('Firestore subscribeToAds setup fallback:', error);
+    return subscribeToAdsSupabase(onUpdate);
+  }
+}
+
+export async function saveAdSlot(ad: Omit<AdSlot, 'id'> & { id?: string }): Promise<AdSlot> {
+  const nowIso = new Date().toISOString();
+  const id = ad.id || `ad_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const dataToSave = {
+    title: ad.title.trim(),
+    placement: ad.placement,
+    html_code: ad.html_code || '',
+    is_active: Boolean(ad.is_active),
+    notes: ad.notes || '',
+    created_at: ad.created_at || nowIso,
+    updated_at: nowIso
+  };
+
+  try {
+    const docRef = doc(db, ADS_COLLECTION, id);
+    await setDoc(docRef, dataToSave, { merge: true });
+  } catch (err) {
+    console.warn('Firestore saveAdSlot fallback to local/supabase:', err);
+  }
+
+  return saveAdSupabase({ id, ...dataToSave });
+}
+
+export async function deleteAdSlot(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, ADS_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Firestore deleteAdSlot fallback:', err);
+  }
+  await deleteAdSupabase(id);
+}
+
+export async function toggleAdSlot(id: string, is_active: boolean): Promise<void> {
+  try {
+    const docRef = doc(db, ADS_COLLECTION, id);
+    await updateDoc(docRef, { is_active, updated_at: new Date().toISOString() });
+  } catch (err) {
+    console.warn('Firestore toggleAdSlot fallback:', err);
+  }
+  await toggleAdSupabase(id, is_active);
+}
+
 export {
   getWhatsappMessagesSupabase,
   subscribeToWhatsappMessagesSupabase,
@@ -764,6 +863,8 @@ export {
   saveWhatsappConfig,
   testWhatsappMessage,
   saveCategoryWhatsappNumber,
-  syncCategoryWhatsAppFromServer
+  syncCategoryWhatsAppFromServer,
+  DEFAULT_INITIAL_ADS
 };
+
 

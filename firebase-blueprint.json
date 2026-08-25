@@ -68,6 +68,21 @@
         "last_visit_date": { "type": "string", "description": "YYYY-MM-DD date string" },
         "last_visit_at": { "type": "string", "description": "ISO timestamp of last visit" }
       }
+    },
+    "AdSlot": {
+      "title": "AdSlot",
+      "description": "Custom HTML / script advertising slot",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Ad unit title" },
+        "placement": { "type": "string", "description": "Placement identifier" },
+        "html_code": { "type": "string", "description": "Raw HTML or script code" },
+        "is_active": { "type": "boolean", "description": "Active status of ad" },
+        "notes": { "type": "string", "description": "Optional notes or instructions" },
+        "created_at": { "type": "string", "description": "ISO creation timestamp" },
+        "updated_at": { "type": "string", "description": "ISO update timestamp" }
+      },
+      "required": ["title", "placement", "html_code", "is_active"]
     }
   },
   "firestore": {
@@ -90,6 +105,10 @@
     "/analytics/{analyticsId}": {
       "schema": "Analytics",
       "description": "Visitor tracking stats"
+    },
+    "/ads/{adId}": {
+      "schema": "AdSlot",
+      "description": "Custom HTML ad units"
     }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats } from './types';
+import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats, AdSlot } from './types';
 import { 
   seedProductsIfEmpty, 
   seedCategoriesIfEmpty,
@@ -9,7 +9,8 @@ import {
   subscribeToOrders, 
   createOrder,
   trackSiteVisit,
-  subscribeToVisitorStats
+  subscribeToVisitorStats,
+  subscribeToAds
 } from './services/storeService';
 
 import { Header } from './components/Header';
@@ -22,6 +23,7 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSection';
 import { NewOrderNotificationToast } from './components/NewOrderNotificationToast';
 import { DepartmentConflictModal } from './components/DepartmentConflictModal';
+import { AdRenderer } from './components/AdRenderer';
 import { buildDepartmentWhatsAppMessage, openWhatsAppDirect } from './utils/whatsappOrder';
 import { playOrderNotificationSound, showBrowserNotification } from './utils/notificationSound';
 
@@ -47,6 +49,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
+  const [ads, setAds] = useState<AdSlot[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -247,6 +250,11 @@ export default function App() {
       setVisitorStats(stats);
     });
 
+    // Subscribe to real-time HTML ads
+    const unsubscribeAds = subscribeToAds((adList) => {
+      setAds(adList);
+    });
+
     return () => {
       clearTimeout(loadingTimeout);
       window.removeEventListener('popstate', handlePopState);
@@ -256,6 +264,7 @@ export default function App() {
       unsubscribeCategories();
       unsubscribeOrders();
       unsubscribeVisitorStats();
+      unsubscribeAds();
     };
   }, []);
 
@@ -447,6 +456,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased selection:bg-emerald-200 selection:text-emerald-900" dir="rtl">
       
+      {/* Background script injection ad slot */}
+      <AdRenderer placement="custom_head_script" ads={ads} />
+
+      {/* Floating Popup Ad Slot */}
+      <AdRenderer placement="popup_ad" ads={ads} />
+
       {/* Navigation Header */}
       <Header
         cartCount={cartTotalCount}
@@ -469,6 +484,9 @@ export default function App() {
         recentOrders={orders}
         onClearUnread={() => setUnreadOrdersCount(0)}
       />
+
+      {/* Top Banner Ad Slot */}
+      <AdRenderer placement="header_top" ads={ads} className="max-w-6xl mx-auto px-4 pt-3" />
 
       {/* Main Content View Switcher */}
       {isAdminLoggedIn && activeView === 'admin' ? (
@@ -517,6 +535,9 @@ export default function App() {
             {/* Subtle background element */}
             <div className="absolute left-[-5%] bottom-[-20%] w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
           </div>
+
+          {/* Home Banner Ad Slot */}
+          <AdRenderer placement="home_banner" ads={ads} className="my-2" />
 
           {/* VIEW MODE 1: SEARCH ACTIVE ACROSS PRODUCTS */}
           {searchQuery.trim().length > 0 ? (
@@ -775,6 +796,9 @@ export default function App() {
                             />
                           ))}
                         </div>
+
+                        {/* Mid-Grid Ad Slot */}
+                        <AdRenderer placement="product_grid_middle" ads={ads} className="my-4" />
                       </div>
                     )}
                   </div>
@@ -789,17 +813,21 @@ export default function App() {
                       <p className="text-xs text-slate-500">قم بإضافة منتجات جديدة من لوحة التحكم لتظهر فوراً هنا.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
-                      {products.map((prod) => (
-                        <ProductCard
-                          key={prod.id}
-                          product={prod}
-                          onSelect={(p) => setSelectedProduct(p)}
-                          onAddToCart={(p) => handleAddToCart(p, 1)}
-                          isAdded={addedItemIds.has(prod.id)}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                        {products.map((prod) => (
+                          <ProductCard
+                            key={prod.id}
+                            product={prod}
+                            onSelect={(p) => setSelectedProduct(p)}
+                            onAddToCart={(p) => handleAddToCart(p, 1)}
+                            isAdded={addedItemIds.has(prod.id)}
+                          />
+                        ))}
+                      </div>
+                      {/* Mid-Grid Ad Slot */}
+                      <AdRenderer placement="product_grid_middle" ads={ads} className="my-4" />
+                    </>
                   )}
                 </div>
               )}
@@ -905,23 +933,30 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
-                  {categoryProducts.map((prod) => (
-                    <ProductCard
-                      key={prod.id}
-                      product={prod}
-                      onSelect={(p) => setSelectedProduct(p)}
-                      onAddToCart={(p) => handleAddToCart(p, 1)}
-                      isAdded={addedItemIds.has(prod.id)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                    {categoryProducts.map((prod) => (
+                      <ProductCard
+                        key={prod.id}
+                        product={prod}
+                        onSelect={(p) => setSelectedProduct(p)}
+                        onAddToCart={(p) => handleAddToCart(p, 1)}
+                        isAdded={addedItemIds.has(prod.id)}
+                      />
+                    ))}
+                  </div>
+                  {/* Category page ad banner */}
+                  <AdRenderer placement="product_grid_middle" ads={ads} className="my-4" />
+                </>
               )}
             </div>
           )}
 
           {/* Public Pending Orders Section */}
           <PendingOrdersPublicSection orders={orders} />
+
+          {/* Bottom / Sidebar Ad Slot before Footer */}
+          <AdRenderer placement="sidebar_or_footer" ads={ads} className="my-4" />
 
           {/* Floating Cart Quick Bar for Mobile */}
           {cartTotalCount > 0 && (
@@ -982,6 +1017,7 @@ export default function App() {
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
         onAddToCart={(p, qty) => handleAddToCart(p, qty)}
+        ads={ads}
       />
 
       <CartModal
@@ -992,6 +1028,7 @@ export default function App() {
         onRemoveItem={handleRemoveFromCart}
         onSubmitOrder={handleSubmitOrder}
         isSubmitting={isSubmittingOrder}
+        ads={ads}
       />
 
       <OrderSuccessModal
@@ -1003,6 +1040,7 @@ export default function App() {
         customer={lastCompletedOrderInfo?.customer}
         orderedItems={lastCompletedOrderInfo?.items}
         categories={categories}
+        ads={ads}
       />
 
       <AdminLoginModal

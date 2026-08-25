@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { Product } from '../types';
+import { Product, AdSlot } from '../types';
 import { X, Plus, Minus, ShoppingBag, Check } from 'lucide-react';
+import { AdRenderer } from './AdRenderer';
 
 interface ProductModalProps {
   product: Product | null;
   onClose: () => void;
   onAddToCart: (product: Product, quantity: number) => void;
+  ads?: AdSlot[];
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
   product,
   onClose,
-  onAddToCart
+  onAddToCart,
+  ads = []
 }) => {
   const [quantity, setQuantity] = useState<number>(1);
   const [added, setAdded] = useState<boolean>(false);
@@ -64,6 +67,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
             {product.description || 'منتج عالي الجودة متوفر للطلب المباشر والتوصيل السريع للمنزل.'}
           </p>
+
+          {/* Ad slot in product modal */}
+          <AdRenderer placement="product_details_modal" ads={ads} />
 
           {/* Quantity selector */}
           <div className="flex items-center justify-between pt-2">
