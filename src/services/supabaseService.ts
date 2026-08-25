@@ -347,25 +347,6 @@ export async function createOrderSupabase(
     throw new Error(itemsError.message);
   }
 
-  // AUTOMATED WHATSAPP DISPATCH (Server-Side)
-  // Automatically split order by category and dispatch to WhatsApp Cloud API without manual intervention
-  try {
-    fetch('/api/send-order-whatsapp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderId })
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log('Automated WhatsApp order dispatch result:', data);
-      })
-      .catch((err) => {
-        console.warn('Background WhatsApp automated dispatch error:', err);
-      });
-  } catch (err) {
-    console.warn('Could not trigger background WhatsApp dispatch:', err);
-  }
-
   return orderId;
 }
 

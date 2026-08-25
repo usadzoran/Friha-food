@@ -463,50 +463,10 @@ export async function toggleProductActive(id: string, currentActive: boolean): P
 export async function createOrder(
   customer: CustomerInfo,
   cartItems: CartItem[]
-): Promise<{ orderId: string; displayOrderNum: string; whatsapp?: any }> {
+): Promise<{ orderId: string; displayOrderNum: string }> {
   const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
-  // 1. Primary path: Call Server-Side API for Order Creation + Instant WhatsApp Department Dispatch
-  try {
-    const payload = {
-      customer: {
-        name: customer.name.trim(),
-        phone: customer.phone.trim(),
-        address: customer.address.trim(),
-        notes: customer.notes.trim()
-      },
-      items: cartItems.map(ci => ({
-        product_id: ci.product.id,
-        product_name: ci.product.name,
-        price: ci.product.price,
-        quantity: ci.quantity,
-        category_id: ci.product.category_id,
-        subtotal: ci.product.price * ci.quantity
-      })),
-      total_price: totalPrice
-    };
-
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.orderId) {
-        return {
-          orderId: data.orderId,
-          displayOrderNum: data.displayOrderNum || `DZ-${data.orderId.slice(-6).toUpperCase()}`,
-          whatsapp: data.whatsapp
-        };
-      }
-    }
-  } catch (apiErr) {
-    console.warn('Server /api/orders route not available or error, falling back to direct DB client:', apiErr);
-  }
-
-  // 2. Fallback path: Direct Supabase creation + background trigger
+  // 1. Supabase database path
   if (isSupabaseConfigured()) {
     const orderId = await createOrderSupabase(
       {
@@ -522,7 +482,7 @@ export async function createOrder(
     return { orderId, displayOrderNum };
   }
 
-  // 3. Fallback path: Firestore
+  // 2. Firestore fallback path
   try {
     const now = new Date().toISOString();
 

@@ -21,6 +21,8 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSection';
 import { NewOrderNotificationToast } from './components/NewOrderNotificationToast';
+import { DepartmentConflictModal } from './components/DepartmentConflictModal';
+import { buildDepartmentWhatsAppMessage, openWhatsAppDirect } from './utils/whatsappOrder';
 import { playOrderNotificationSound, showBrowserNotification } from './utils/notificationSound';
 
 import { 
@@ -61,6 +63,11 @@ export default function App() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [completedOrderNum, setCompletedOrderNum] = useState<string | null>(null);
   const [lastCompletedOrderInfo, setLastCompletedOrderInfo] = useState<{ customer: CustomerInfo; items: CartItem[] } | null>(null);
+  const [departmentConflict, setDepartmentConflict] = useState<{
+    activeCategoryName: string;
+    attemptedCategoryName?: string;
+    attemptedProductName?: string;
+  } | null>(null);
 
   // Admin state
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
@@ -276,6 +283,36 @@ export default function App() {
 
   // Cart helper functions
   const handleAddToCart = (product: Product, quantity = 1) => {
+    // 1. Single Department Enforcement:
+    // If the cart already has items, verify that the new product is from the same department/category
+    if (cartItems.length > 0) {
+      const firstCatId = cartItems[0]?.product?.category_id || 'general';
+      const activeCat = categories.find(c => c.id === firstCatId || c.name === firstCatId) || {
+        id: firstCatId,
+        name: firstCatId === 'general' ? 'القسم العام' : firstCatId
+      };
+
+      const prodCatId = product.category_id || 'general';
+      const prodCat = categories.find(c => c.id === prodCatId || c.name === prodCatId) || {
+        id: prodCatId,
+        name: prodCatId === 'general' ? 'القسم العام' : prodCatId
+      };
+
+      const isSameCategory =
+        (activeCat.id && prodCat.id && activeCat.id === prodCat.id) ||
+        (activeCat.name && prodCat.name && activeCat.name.trim().toLowerCase() === prodCat.name.trim().toLowerCase());
+
+      if (!isSameCategory) {
+        // Block addition, show clear conflict message with "العودة إلى طلبيتي", and DO NOT clear current cart
+        setDepartmentConflict({
+          activeCategoryName: activeCat.name,
+          attemptedCategoryName: prodCat.name,
+          attemptedProductName: product.name
+        });
+        return;
+      }
+    }
+
     setCartItems((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
@@ -317,13 +354,37 @@ export default function App() {
     setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
   };
 
-  // Submit Order to Firestore
+  // Submit Order & Direct WhatsApp Launch
   const handleSubmitOrder = async (customer: CustomerInfo) => {
     if (cartItems.length === 0) return;
     setIsSubmittingOrder(true);
     try {
       const itemsSnapshot = [...cartItems];
+      const firstProd = itemsSnapshot[0]?.product;
+      const deptCat = categories.find(c => c.id === firstProd?.category_id || c.name === firstProd?.category_id) || {
+        id: firstProd?.category_id || 'general',
+        name: firstProd?.category_id || 'القسم العام',
+        whatsapp_number: ''
+      };
+
+      const totalPrice = itemsSnapshot.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+
+      // 1. Save order to database
       const { displayOrderNum } = await createOrder(customer, itemsSnapshot);
+
+      // 2. Generate WhatsApp pre-filled message according to exact format
+      const messageText = buildDepartmentWhatsAppMessage({
+        orderNumber: displayOrderNum,
+        categoryName: deptCat.name,
+        customer,
+        items: itemsSnapshot,
+        totalPrice
+      });
+
+      // 3. Open WhatsApp directly on customer device
+      openWhatsAppDirect(deptCat.whatsapp_number || '', messageText);
+
+      // 4. Update state, clear cart, close cart modal, open confirmation
       setLastCompletedOrderInfo({
         customer: { ...customer },
         items: itemsSnapshot
@@ -948,6 +1009,18 @@ export default function App() {
         isOpen={isAdminModalOpen}
         onClose={handleCloseAdminModal}
         onLoginSuccess={handleAdminLoginSuccess}
+      />
+
+      <DepartmentConflictModal
+        isOpen={!!departmentConflict}
+        onClose={() => setDepartmentConflict(null)}
+        activeCategoryName={departmentConflict?.activeCategoryName || ''}
+        attemptedCategoryName={departmentConflict?.attemptedCategoryName}
+        attemptedProductName={departmentConflict?.attemptedProductName}
+        onOpenCurrentCart={() => {
+          setDepartmentConflict(null);
+          setIsCartOpen(true);
+        }}
       />
 
       {/* Real-time Order Notification Toast */}

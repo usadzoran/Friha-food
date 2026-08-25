@@ -1,6 +1,11 @@
 import React from 'react';
-import { CheckCircle2, PhoneCall, ShoppingBag, MessageSquare, Bell, ArrowLeft, Send } from 'lucide-react';
+import { CheckCircle2, ShoppingBag, MessageSquare, ExternalLink, ArrowLeft } from 'lucide-react';
 import { CartItem, Category, CustomerInfo } from '../types';
+import { 
+  buildDepartmentWhatsAppMessage, 
+  buildWhatsAppDirectUrl, 
+  openWhatsAppDirect 
+} from '../utils/whatsappOrder';
 
 interface OrderSuccessModalProps {
   orderNumber: string | null;
@@ -19,179 +24,127 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
 }) => {
   if (!orderNumber) return null;
 
-  // Group ordered items by category
-  const categoryGroups: {
-    category: Category | { id: string; name: string; whatsapp_number?: string };
-    items: CartItem[];
-    subtotal: number;
-  }[] = [];
+  // Single active department for this completed order
+  const firstItemCatId = orderedItems[0]?.product?.category_id || 'general';
+  const categoryObj = categories.find(c => c.id === firstItemCatId || c.name === firstItemCatId) || {
+    id: firstItemCatId,
+    name: firstItemCatId === 'general' ? 'قسم عام' : firstItemCatId,
+    whatsapp_number: ''
+  };
 
-  const catMap = new Map<string, { cat: any; items: CartItem[]; subtotal: number }>();
+  const categoryName = categoryObj.name || 'المتجر';
+  const whatsappNumber = categoryObj.whatsapp_number || '';
+  const totalOrderPrice = orderedItems.reduce((sum, it) => sum + (it.product.price * it.quantity), 0);
 
-  orderedItems.forEach(item => {
-    const prodCatId = item.product.category_id || 'general';
-    const foundCat = categories.find(c => c.id === prodCatId || c.name === prodCatId) || {
-      id: prodCatId,
-      name: prodCatId === 'general' ? 'القسم العام' : prodCatId,
-      whatsapp_number: ''
-    };
+  const messageText = customer ? buildDepartmentWhatsAppMessage({
+    orderNumber,
+    categoryName,
+    customer,
+    items: orderedItems,
+    totalPrice: totalOrderPrice
+  }) : '';
 
-    const key = foundCat.id || foundCat.name;
-    if (!catMap.has(key)) {
-      catMap.set(key, { cat: foundCat, items: [], subtotal: 0 });
-    }
-    const group = catMap.get(key)!;
-    group.items.push(item);
-    group.subtotal += item.product.price * item.quantity;
-  });
+  const whatsappDirectUrl = customer ? buildWhatsAppDirectUrl(whatsappNumber, messageText) : '';
 
-  catMap.forEach((val) => {
-    categoryGroups.push({
-      category: val.cat,
-      items: val.items,
-      subtotal: val.subtotal
-    });
-  });
-
-  const totalOrderPrice = orderedItems.reduce((sum, it) => sum + it.product.price * it.quantity, 0);
-
-  // Helper to open WhatsApp for a specific department
-  const handleOpenDepartmentWhatsApp = (deptGroup: typeof categoryGroups[0]) => {
-    const rawPhone = (deptGroup.category.whatsapp_number || '').trim();
-    let cleanPhone = rawPhone.replace(/[^\d]/g, '');
-    if (cleanPhone.startsWith('0') && cleanPhone.length >= 9) {
-      cleanPhone = '213' + cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith('00')) {
-      cleanPhone = cleanPhone.substring(2);
-    }
-
-    const itemsText = deptGroup.items.map((it, idx) => 
-      `▫️ ${idx + 1}. *${it.product.name}*\n   الكمية: ${it.quantity} | السعر: ${it.product.price.toLocaleString('ar-DZ')} د.ج`
-    ).join('\n\n');
-
-    const customerText = customer ? (
-      `👤 *معلومات الزبون:*\n` +
-      `• الاسم: ${customer.name}\n` +
-      `• الهاتف: ${customer.phone}\n` +
-      `• العنوان: ${customer.address}\n` +
-      (customer.notes ? `• ملاحظات: ${customer.notes}\n` : '')
-    ) : '';
-
-    const message = 
-      `🛒 *طلبية جديدة #${orderNumber}*\n` +
-      `🏢 *قسم:* ${deptGroup.category.name}\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `${customerText}` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *المنتجات المطلوبة من هذا القسم:*\n\n` +
-      `${itemsText}\n\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `💰 *حساب هذا القسم:* *${deptGroup.subtotal.toLocaleString('ar-DZ')} د.ج*\n` +
-      `💵 *إجمالي الطلبية:* *${totalOrderPrice.toLocaleString('ar-DZ')} د.ج*\n` +
-      `⏰ *الوقت:* ${new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `_تم إرسال الطلب عبر متجر اشري من دارك_`;
-
-    const targetUrl = cleanPhone 
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-    window.open(targetUrl, '_blank');
+  const handleOpenWhatsApp = () => {
+    if (!customer) return;
+    openWhatsAppDirect(whatsappNumber, messageText);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
       <div 
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5 sm:p-6 text-center space-y-4 border border-slate-100 my-auto"
+        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-7 text-center space-y-5 border border-slate-100 my-auto animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Animated Check Icon */}
-        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 animate-bounce">
+        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
           <CheckCircle2 className="w-10 h-10" />
         </div>
 
-        <div className="space-y-1.5">
+        {/* Title & Key Notice */}
+        <div className="space-y-2">
           <h2 className="text-xl sm:text-2xl font-black text-slate-800">
-            تم تسجيل طلبك بنجاح!
+            ✅ تم تجهيز طلبك
           </h2>
-          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 py-1.5 px-3 rounded-xl border border-emerald-100 max-w-sm mx-auto">
-            <Bell className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>تم إخطار النظام وتحويل الطلبية إلى الأقسام المعنية فوراً</span>
+          
+          <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-right space-y-1.5">
+            <p className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>سيتم فتح WhatsApp لإرسال الطلب إلى المطعم.</span>
+            </p>
+            <p className="text-xs text-emerald-800 font-medium leading-relaxed pr-5">
+              اضغط <span className="font-black underline">"إرسال"</span> في تطبيق WhatsApp لتأكيد الإرسال إلى قسم <span className="font-bold">({categoryName})</span>.
+            </p>
           </div>
         </div>
 
-        {/* Order Number Card */}
-        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-right space-y-2">
-          <div className="flex justify-between items-center text-xs text-slate-500 font-bold border-b border-slate-200 pb-2">
-            <span>رقم الطلب الخاص بك:</span>
-            <span className="font-mono text-emerald-700 font-black text-sm bg-white px-2.5 py-0.5 rounded border border-slate-200">
-              {orderNumber}
+        {/* Order Details Card */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-right space-y-2.5">
+          <div className="flex justify-between items-center text-xs text-slate-600 font-bold border-b border-slate-200 pb-2">
+            <span>رقم الطلب:</span>
+            <span className="font-mono text-emerald-700 font-black text-sm bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+              #{orderNumber.replace(/^#/, '')}
             </span>
           </div>
 
-          <div className="flex items-start gap-2 text-xs text-slate-600 pt-1">
-            <PhoneCall className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <span>سيتصل بك فريق الخدمة والتوصيل قريباً لتأكيد العنوان والموعد.</span>
+          <div className="flex justify-between items-center text-xs text-slate-600">
+            <span>القسم:</span>
+            <span className="font-bold text-slate-800 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+              {categoryName}
+            </span>
+          </div>
+
+          {customer && (
+            <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-slate-100">
+              <div className="flex justify-between">
+                <span className="text-slate-500">الزبون:</span>
+                <span className="font-bold text-slate-800">{customer.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">الهاتف:</span>
+                <span className="font-bold text-slate-800" dir="ltr">{customer.phone}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center text-xs text-slate-800 font-bold pt-2 border-t border-slate-200">
+            <span>المجموع الإجمالي:</span>
+            <span className="text-emerald-700 font-black text-sm">
+              {totalOrderPrice.toLocaleString('ar-DZ')} د.ج
+            </span>
           </div>
         </div>
 
-        {/* Department WhatsApp Direct Dispatch Buttons */}
-        {categoryGroups.length > 0 && (
-          <div className="space-y-2 text-right">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
-              <span className="flex items-center gap-1">
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                <span>إرسال وتأكيد الطلبية عبر WhatsApp للأقسام:</span>
-              </span>
-            </div>
+        {/* Big WhatsApp Launch Button */}
+        <div className="space-y-2 pt-1">
+          <a
+            href={whatsappDirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              // Also trigger direct helper
+              handleOpenWhatsApp();
+            }}
+            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black rounded-2xl text-sm sm:text-base shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <MessageSquare className="w-5 h-5 text-amber-300" />
+            <span>فتح WhatsApp وتأكيد الإرسال</span>
+            <ExternalLink className="w-4 h-4 text-emerald-200" />
+          </a>
 
-            <div className="space-y-2">
-              {categoryGroups.map((grp, idx) => {
-                const hasPhone = Boolean((grp.category.whatsapp_number || '').trim());
-                return (
-                  <div
-                    key={idx}
-                    className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
-                  >
-                    <div className="text-right">
-                      <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span>قسم: {grp.category.name}</span>
-                        <span className="text-[10px] text-slate-500 font-normal">
-                          ({grp.items.length} {grp.items.length === 1 ? 'منتج' : 'منتجات'})
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-emerald-700 font-bold mt-0.5">
-                        المجموع: {grp.subtotal.toLocaleString('ar-DZ')} د.ج
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDepartmentWhatsApp(grp)}
-                      className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>
-                        {hasPhone ? `إرسال لواتساب قسم (${grp.category.name})` : `مشاركة الطلب لواتساب (${grp.category.name})`}
-                      </span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Action Button */}
-        <button
-          onClick={onClose}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold rounded-xl text-sm transition-all"
-        >
-          <ShoppingBag className="w-4 h-4" />
-          <span>العودة للمتجر ومتابعة التسوق</span>
-        </button>
+          {/* Close / Start New Order */}
+          <button
+            onClick={onClose}
+            className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs sm:text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            <ShoppingBag className="w-4 h-4 text-slate-500" />
+            <span>إنهاء والعودة لإنشاء طلبية جديدة</span>
+            <ArrowLeft className="w-4 h-4 text-slate-400" />
+          </button>
+        </div>
       </div>
     </div>
   );
 };
+
