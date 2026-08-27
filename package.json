@@ -8,7 +8,6 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
-    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -19,7 +18,6 @@
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "firebase": "^12.17.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",

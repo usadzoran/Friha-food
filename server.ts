@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import {
   getCategoryWhatsAppNumbers,
@@ -9,8 +8,7 @@ import {
   saveSingleCategoryWhatsAppNumber
 } from './server/whatsapp';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const rootDir = process.cwd();
 
 async function startServer() {
   const app = express();
@@ -68,7 +66,7 @@ async function startServer() {
     app.get('*', async (req, res, next) => {
       try {
         const url = req.originalUrl;
-        const indexPath = path.resolve(__dirname, 'index.html');
+        const indexPath = path.resolve(rootDir, 'index.html');
         let template = fs.readFileSync(indexPath, 'utf-8');
         const html = await vite.transformIndexHtml(url, template);
         res.status(200).set({ 'Content-Type': 'text/html' }).send(html);
