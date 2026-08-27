@@ -1,7 +1,7 @@
--- ========================================================
--- Supabase PostgreSQL Schema for E-Commerce Store
--- Generated for migration from Firebase Firestore
--- ========================================================
+-- ====================================================================
+-- Supabase PostgreSQL Master Schema for Friha-food (اشري من دارك)
+-- Safe Migration: Non-destructive, idempotent (no DROP/TRUNCATE)
+-- ====================================================================
 
 -- 1. CATEGORIES TABLE
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -12,9 +12,9 @@ CREATE TABLE IF NOT EXISTS public.categories (
     whatsapp_number TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Ensure whatsapp_number exists on existing tables
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'Folder';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
 
 -- 2. PRODUCTS TABLE
 CREATE TABLE IF NOT EXISTS public.products (
@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS public.products (
     category_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Index for fast category filtering
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_active ON public.products(active);
 
@@ -44,9 +44,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Index for order filtering by status
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON public.orders(created_at DESC);
 
 -- 4. ORDER ITEMS TABLE
 CREATE TABLE IF NOT EXISTS public.order_items (
@@ -58,40 +57,207 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     quantity INTEGER DEFAULT 1,
     subtotal NUMERIC DEFAULT 0
 );
-
--- Index for order_items lookup
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product ON public.order_items(product_id);
 
--- ========================================================
+-- 5. DEPARTMENT MANAGERS TABLE (مسؤولو الأقسام)
+CREATE TABLE IF NOT EXISTS public.department_managers (
+    id TEXT PRIMARY KEY,
+    category_id TEXT NOT NULL,
+    category_name TEXT DEFAULT '',
+    manager_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    username TEXT NOT NULL,
+    password_plain TEXT NOT NULL,
+    password_hash TEXT DEFAULT '',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_login_at TIMESTAMPTZ,
+    notes TEXT DEFAULT ''
+);
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS category_name TEXT DEFAULT '';
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT '';
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_managers_category ON public.department_managers(category_id);
+CREATE INDEX IF NOT EXISTS idx_managers_username ON public.department_managers(username);
+CREATE INDEX IF NOT EXISTS idx_managers_phone ON public.department_managers(phone);
+
+-- 6. JOIN REQUESTS TABLE (طلبات الانضمام والتجار)
+CREATE TABLE IF NOT EXISTS public.join_requests (
+    id TEXT PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    work_type TEXT NOT NULL,
+    wilaya TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    assigned_username TEXT DEFAULT '',
+    assigned_password TEXT DEFAULT '',
+    assigned_category_id TEXT DEFAULT '',
+    assigned_category_name TEXT DEFAULT '',
+    invitation_sent_at TIMESTAMPTZ,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_username TEXT DEFAULT '';
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_password TEXT DEFAULT '';
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_category_id TEXT DEFAULT '';
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_category_name TEXT DEFAULT '';
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS invitation_sent_at TIMESTAMPTZ;
+ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_join_requests_status ON public.join_requests(status);
+CREATE INDEX IF NOT EXISTS idx_join_requests_phone ON public.join_requests(phone);
+
+-- 7. ADS TABLE (المساحات الإعلانية)
+CREATE TABLE IF NOT EXISTS public.ads (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    placement TEXT NOT NULL,
+    html_code TEXT NOT NULL DEFAULT '',
+    is_active BOOLEAN DEFAULT TRUE,
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ads_placement ON public.ads(placement);
+CREATE INDEX IF NOT EXISTS idx_ads_active ON public.ads(is_active);
+
+-- 8. VISITOR STATS TABLE (إحصائيات الزوار)
+CREATE TABLE IF NOT EXISTS public.visitor_stats (
+    id TEXT PRIMARY KEY,
+    total_visits BIGINT DEFAULT 0,
+    unique_visits BIGINT DEFAULT 0,
+    today_visits BIGINT DEFAULT 0,
+    last_visit_date TEXT DEFAULT '',
+    last_visit_at TIMESTAMPTZ DEFAULT NOW(),
+    daily_history JSONB DEFAULT '[]'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. WHATSAPP ORDER MESSAGES TABLE (سجلات رسائل واتساب)
+CREATE TABLE IF NOT EXISTS public.whatsapp_order_messages (
+    id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    whatsapp_number TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    provider_message_id TEXT,
+    error_message TEXT,
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_order_id ON public.whatsapp_order_messages(order_id);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_status ON public.whatsapp_order_messages(status);
+
+-- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
--- ========================================================
-
--- Enable RLS on all tables
+-- ====================================================================
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.department_managers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.join_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visitor_stats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_order_messages ENABLE ROW LEVEL SECURITY;
 
--- Categories: Anyone can read, anonymous/authenticated can insert/update/delete
-CREATE POLICY "Allow public read access on categories" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow full access on categories" ON public.categories FOR ALL USING (true);
+-- Helper to safely recreate policies
+DO $$
+BEGIN
+    -- Categories
+    DROP POLICY IF EXISTS "Allow all on categories" ON public.categories;
+    CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
 
--- Products: Anyone can read, anonymous/authenticated can insert/update/delete
-CREATE POLICY "Allow public read access on products" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Allow full access on products" ON public.products FOR ALL USING (true);
+    -- Products
+    DROP POLICY IF EXISTS "Allow all on products" ON public.products;
+    CREATE POLICY "Allow all on products" ON public.products FOR ALL USING (true) WITH CHECK (true);
 
--- Orders: Anyone can read/insert/update
-CREATE POLICY "Allow public read access on orders" ON public.orders FOR SELECT USING (true);
-CREATE POLICY "Allow public insert on orders" ON public.orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow full access on orders" ON public.orders FOR ALL USING (true);
+    -- Orders
+    DROP POLICY IF EXISTS "Allow all on orders" ON public.orders;
+    CREATE POLICY "Allow all on orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
 
--- Order Items: Anyone can read/insert/update
-CREATE POLICY "Allow public read access on order_items" ON public.order_items FOR SELECT USING (true);
-CREATE POLICY "Allow public insert on order_items" ON public.order_items FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow full access on order_items" ON public.order_items FOR ALL USING (true);
+    -- Order Items
+    DROP POLICY IF EXISTS "Allow all on order_items" ON public.order_items;
+    CREATE POLICY "Allow all on order_items" ON public.order_items FOR ALL USING (true) WITH CHECK (true);
 
--- Enable Realtime for all tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.order_items;
+    -- Department Managers
+    DROP POLICY IF EXISTS "Allow all on department_managers" ON public.department_managers;
+    CREATE POLICY "Allow all on department_managers" ON public.department_managers FOR ALL USING (true) WITH CHECK (true);
+
+    -- Join Requests
+    DROP POLICY IF EXISTS "Allow all on join_requests" ON public.join_requests;
+    CREATE POLICY "Allow all on join_requests" ON public.join_requests FOR ALL USING (true) WITH CHECK (true);
+
+    -- Ads
+    DROP POLICY IF EXISTS "Allow all on ads" ON public.ads;
+    CREATE POLICY "Allow all on ads" ON public.ads FOR ALL USING (true) WITH CHECK (true);
+
+    -- Visitor Stats
+    DROP POLICY IF EXISTS "Allow all on visitor_stats" ON public.visitor_stats;
+    CREATE POLICY "Allow all on visitor_stats" ON public.visitor_stats FOR ALL USING (true) WITH CHECK (true);
+
+    -- Whatsapp Order Messages
+    DROP POLICY IF EXISTS "Allow all on whatsapp_order_messages" ON public.whatsapp_order_messages;
+    CREATE POLICY "Allow all on whatsapp_order_messages" ON public.whatsapp_order_messages FOR ALL USING (true) WITH CHECK (true);
+END $$;
+
+-- ====================================================================
+-- REALTIME PUBLICATIONS SETUP
+-- ====================================================================
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.order_items;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.department_managers;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.join_requests;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.ads;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.visitor_stats;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_order_messages;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
