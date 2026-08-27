@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Category, Product, Order, OrderItem, OrderStatus, WhatsappOrderMessage, WhatsappConfigStatus, VisitorStats, AdSlot } from '../types';
+import { Category, Product, Order, OrderItem, OrderStatus, WhatsappOrderMessage, WhatsappConfigStatus, VisitorStats, AdSlot, DepartmentManager, JoinRequest, JoinRequestStatus } from '../types';
 
 // Category WhatsApp Numbers local & server synchronization cache
 const CATEGORY_WHATSAPP_STORAGE_KEY = 'dz_category_whatsapp_store';
@@ -870,5 +870,443 @@ export function subscribeToAdsSupabase(onUpdate: (ads: AdSlot[]) => void) {
     adListeners.delete(onUpdate);
   };
 }
+
+// -------------------------------------------------------------
+// DEPARTMENT MANAGERS (SUPABASE INTEGRATION + LOCAL CACHE)
+// -------------------------------------------------------------
+const MANAGERS_STORAGE_KEY = 'dz_department_managers_list';
+const managerListeners: Set<(managers: DepartmentManager[]) => void> = new Set();
+
+function getStoredDepartmentManagers(): DepartmentManager[] {
+  try {
+    const raw = localStorage.getItem(MANAGERS_STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {}
+  return [];
+}
+
+function saveStoredDepartmentManagers(managers: DepartmentManager[]): void {
+  try {
+    localStorage.setItem(MANAGERS_STORAGE_KEY, JSON.stringify(managers));
+  } catch {}
+  managerListeners.forEach((fn) => {
+    try {
+      fn(managers);
+    } catch {}
+  });
+}
+
+export async function getDepartmentManagersSupabase(): Promise<DepartmentManager[]> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('department_managers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const list = data as DepartmentManager[];
+        saveStoredDepartmentManagers(list);
+        return list;
+      }
+    } catch (err) {
+      console.warn('Supabase getDepartmentManagers error, using local storage cache:', err);
+    }
+  }
+  return getStoredDepartmentManagers();
+}
+
+export async function saveDepartmentManagerSupabase(
+  manager: Omit<DepartmentManager, 'id' | 'created_at'> & { id?: string; created_at?: string }
+): Promise<DepartmentManager> {
+  const nowIso = new Date().toISOString();
+  const id = manager.id || `mgr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const cleanPhone = (manager.phone || '').trim();
+
+  const dataToSave: DepartmentManager = {
+    id,
+    category_id: manager.category_id,
+    category_name: manager.category_name || '',
+    manager_name: manager.manager_name.trim(),
+    phone: cleanPhone,
+    username: manager.username.trim().toLowerCase(),
+    password_plain: manager.password_plain.trim(),
+    is_active: manager.is_active !== undefined ? Boolean(manager.is_active) : true,
+    created_at: manager.created_at || nowIso,
+    last_login_at: manager.last_login_at || '',
+    notes: manager.notes || ''
+  };
+
+  // If department has a WhatsApp number set, sync it with category
+  if (cleanPhone && manager.category_id) {
+    saveCategoryWhatsappNumber(manager.category_id, cleanPhone);
+  }
+
+  // 1. Update local storage
+  const current = getStoredDepartmentManagers();
+  const existingIdx = current.findIndex((m) => m.id === id);
+  let updatedList: DepartmentManager[];
+  if (existingIdx >= 0) {
+    updatedList = [...current];
+    updatedList[existingIdx] = dataToSave;
+  } else {
+    updatedList = [dataToSave, ...current];
+  }
+  saveStoredDepartmentManagers(updatedList);
+
+  // 2. Persist to Supabase
+  if (supabase) {
+    try {
+      await supabase.from('department_managers').upsert(dataToSave, { onConflict: 'id' });
+    } catch (err) {
+      console.warn('Supabase saveDepartmentManager upsert fallback:', err);
+    }
+  }
+
+  return dataToSave;
+}
+
+export async function deleteDepartmentManagerSupabase(id: string): Promise<void> {
+  const current = getStoredDepartmentManagers();
+  const filtered = current.filter((m) => m.id !== id);
+  saveStoredDepartmentManagers(filtered);
+
+  if (supabase) {
+    try {
+      await supabase.from('department_managers').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase deleteDepartmentManager fallback:', err);
+    }
+  }
+}
+
+export async function toggleDepartmentManagerActiveSupabase(
+  id: string,
+  is_active: boolean
+): Promise<void> {
+  const current = getStoredDepartmentManagers();
+  const updated = current.map((m) => (m.id === id ? { ...m, is_active } : m));
+  saveStoredDepartmentManagers(updated);
+
+  if (supabase) {
+    try {
+      await supabase.from('department_managers').update({ is_active }).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase toggleDepartmentManagerActive fallback:', err);
+    }
+  }
+}
+
+export function subscribeToDepartmentManagersSupabase(
+  onUpdate: (managers: DepartmentManager[]) => void
+): () => void {
+  const initial = getStoredDepartmentManagers();
+  if (initial.length > 0) {
+    onUpdate(initial);
+  }
+  managerListeners.add(onUpdate);
+
+  if (supabase) {
+    getDepartmentManagersSupabase().then(onUpdate);
+
+    try {
+      const channelId = `public-managers-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase
+        .channel(channelId)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'department_managers' }, () => {
+          getDepartmentManagersSupabase().then(onUpdate);
+        })
+        .subscribe();
+
+      return () => {
+        managerListeners.delete(onUpdate);
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      };
+    } catch {
+      return () => {
+        managerListeners.delete(onUpdate);
+      };
+    }
+  }
+
+  return () => {
+    managerListeners.delete(onUpdate);
+  };
+}
+
+export async function authenticateDepartmentManagerSupabase(
+  usernameOrPhone: string,
+  passwordOrPin: string
+): Promise<DepartmentManager | null> {
+  const cleanUser = (usernameOrPhone || '').trim().toLowerCase();
+  const cleanPass = (passwordOrPin || '').trim();
+
+  if (!cleanUser || !cleanPass) return null;
+
+  const managers = await getDepartmentManagersSupabase();
+
+  const found = managers.find((m) => {
+    if (!m.is_active) return false;
+    const matchUser =
+      m.username.toLowerCase() === cleanUser ||
+      m.phone.replace(/[^0-9]/g, '') === cleanUser.replace(/[^0-9]/g, '');
+    const matchPass = m.password_plain === cleanPass;
+    return matchUser && matchPass;
+  });
+
+  if (found) {
+    const updated = { ...found, last_login_at: new Date().toISOString() };
+    saveDepartmentManagerSupabase(updated).catch(() => {});
+    return updated;
+  }
+
+  return null;
+}
+
+// -------------------------------------------------------------
+// JOIN REQUESTS (طلبات الانضمام للموقع) & INVITATION WORKFLOW
+// -------------------------------------------------------------
+const JOIN_REQUESTS_STORAGE_KEY = 'dz_join_requests_list';
+const joinRequestListeners: Set<(requests: JoinRequest[]) => void> = new Set();
+
+function getStoredJoinRequests(): JoinRequest[] {
+  try {
+    const raw = localStorage.getItem(JOIN_REQUESTS_STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {}
+  return [];
+}
+
+function saveStoredJoinRequests(requests: JoinRequest[]): void {
+  try {
+    localStorage.setItem(JOIN_REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+  } catch {}
+  joinRequestListeners.forEach((fn) => {
+    try {
+      fn(requests);
+    } catch {}
+  });
+}
+
+export async function getJoinRequestsSupabase(): Promise<JoinRequest[]> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('join_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const list = data as JoinRequest[];
+        saveStoredJoinRequests(list);
+        return list;
+      }
+    } catch (err) {
+      console.warn('Supabase getJoinRequests error, fallback to local storage:', err);
+    }
+  }
+  return getStoredJoinRequests();
+}
+
+export async function submitJoinRequestSupabase(
+  request: Omit<JoinRequest, 'id' | 'created_at' | 'status'>
+): Promise<JoinRequest> {
+  const nowIso = new Date().toISOString();
+  const id = `join_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const cleanPhone = (request.phone || '').trim();
+
+  const newRequest: JoinRequest = {
+    id,
+    first_name: request.first_name.trim(),
+    last_name: request.last_name.trim(),
+    phone: cleanPhone,
+    work_type: request.work_type.trim(),
+    wilaya: (request.wilaya || '').trim(),
+    notes: (request.notes || '').trim(),
+    status: 'pending',
+    created_at: nowIso
+  };
+
+  // 1. Update local storage
+  const current = getStoredJoinRequests();
+  const updatedList = [newRequest, ...current];
+  saveStoredJoinRequests(updatedList);
+
+  // 2. Persist to Supabase
+  if (supabase) {
+    try {
+      await supabase.from('join_requests').insert(newRequest);
+    } catch (err) {
+      console.warn('Supabase submitJoinRequest fallback:', err);
+    }
+  }
+
+  return newRequest;
+}
+
+export async function updateJoinRequestSupabase(
+  id: string,
+  updates: Partial<JoinRequest>
+): Promise<JoinRequest | null> {
+  const current = getStoredJoinRequests();
+  const index = current.findIndex((r) => r.id === id);
+  if (index === -1) return null;
+
+  const updatedReq: JoinRequest = {
+    ...current[index],
+    ...updates,
+    reviewed_at: updates.reviewed_at || new Date().toISOString()
+  };
+
+  current[index] = updatedReq;
+  saveStoredJoinRequests([...current]);
+
+  if (supabase) {
+    try {
+      await supabase.from('join_requests').update(updatedReq).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase updateJoinRequest fallback:', err);
+    }
+  }
+
+  return updatedReq;
+}
+
+export async function deleteJoinRequestSupabase(id: string): Promise<void> {
+  const current = getStoredJoinRequests();
+  const filtered = current.filter((r) => r.id !== id);
+  saveStoredJoinRequests(filtered);
+
+  if (supabase) {
+    try {
+      await supabase.from('join_requests').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase deleteJoinRequest fallback:', err);
+    }
+  }
+}
+
+export function subscribeToJoinRequestsSupabase(
+  onUpdate: (requests: JoinRequest[]) => void
+): () => void {
+  const initial = getStoredJoinRequests();
+  if (initial.length > 0) {
+    onUpdate(initial);
+  }
+  joinRequestListeners.add(onUpdate);
+
+  if (supabase) {
+    getJoinRequestsSupabase().then(onUpdate);
+
+    try {
+      const channelId = `public-join-requests-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase
+        .channel(channelId)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => {
+          getJoinRequestsSupabase().then(onUpdate);
+        })
+        .subscribe();
+
+      return () => {
+        joinRequestListeners.delete(onUpdate);
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      };
+    } catch {
+      return () => {
+        joinRequestListeners.delete(onUpdate);
+      };
+    }
+  }
+
+  return () => {
+    joinRequestListeners.delete(onUpdate);
+  };
+}
+
+/**
+ * Approves a join request, auto-creates an active Department Manager account
+ * and returns the invitation details and WhatsApp invitation URL.
+ */
+export async function approveAndInviteJoinRequestSupabase(params: {
+  requestId: string;
+  categoryId: string;
+  categoryName: string;
+  username: string;
+  passwordPlain: string;
+  notes?: string;
+}): Promise<{
+  manager: DepartmentManager;
+  updatedRequest: JoinRequest;
+  whatsappUrl: string;
+  invitationText: string;
+}> {
+  const currentRequests = await getJoinRequestsSupabase();
+  const req = currentRequests.find((r) => r.id === params.requestId);
+  if (!req) {
+    throw new Error('لم يتم العثور على طلب الانضمام');
+  }
+
+  const managerFullName = `${req.first_name} ${req.last_name}`.trim();
+  const phone = req.phone.trim();
+
+  // 1. Create or update Department Manager
+  const manager = await saveDepartmentManagerSupabase({
+    category_id: params.categoryId,
+    category_name: params.categoryName,
+    manager_name: managerFullName,
+    phone: phone,
+    username: params.username.trim().toLowerCase(),
+    password_plain: params.passwordPlain.trim(),
+    is_active: true,
+    notes: `تم إنشاؤه عبر قبول طلب الانضمام (نوع العمل: ${req.work_type}) - ${params.notes || ''}`
+  });
+
+  // 2. Update Join Request status to approved with credentials
+  const nowIso = new Date().toISOString();
+  const updatedRequest = (await updateJoinRequestSupabase(params.requestId, {
+    status: 'approved',
+    assigned_category_id: params.categoryId,
+    assigned_category_name: params.categoryName,
+    assigned_username: params.username.trim().toLowerCase(),
+    assigned_password: params.passwordPlain.trim(),
+    invitation_sent_at: nowIso,
+    reviewed_at: nowIso
+  })) || {
+    ...req,
+    status: 'approved' as JoinRequestStatus,
+    assigned_username: params.username,
+    assigned_password: params.passwordPlain
+  };
+
+  // 3. Build WhatsApp Invitation text
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://ashri-min-darak.dz';
+  const invitationText = `مرحباً بك أخي الكريم ${managerFullName} 🌟\n\nيسر إدارة منصة *اشري من دارك* إبلاغك بأنه قد تمت الموافقة على طلب انضمامك إلينا كمسؤول شريك لقسم (*${params.categoryName}*)! 🛍️✨\n\n🔑 *بيانات تسجيل الدخول الخاصة بك:*\n━━━━━━━━━━━━━━━━\n👤 *اسم المستخدم:* \`${params.username.trim().toLowerCase()}\`\n🔒 *كلمة المرور:* \`${params.passwordPlain.trim()}\`\n🏷️ *القسم المخصص:* ${params.categoryName}\n━━━━━━━━━━━━━━━━\n\n🌐 *رابط الدخول للوحة تحكم القسم:* \n${appOrigin}\n(قم بالضغط على زر "دخول الإدارة" ثم اختر "دخول مسؤولي الأقسام" وأدخل بياناتك أعلاه).\n\nنتمنى لك عملاً موفقاً ومبيعات ممتازة معنا! 🎉`;
+
+  // Format clean phone for WhatsApp
+  let cleanNumber = phone.replace(/[^0-9]/g, '');
+  if (cleanNumber.startsWith('0')) {
+    cleanNumber = '213' + cleanNumber.substring(1);
+  } else if (!cleanNumber.startsWith('213') && cleanNumber.length === 9) {
+    cleanNumber = '213' + cleanNumber;
+  }
+
+  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(invitationText)}`;
+
+  return {
+    manager,
+    updatedRequest,
+    whatsappUrl,
+    invitationText
+  };
+}
+
 
 

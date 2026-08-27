@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Store, Bell, Volume2, Shield, ExternalLink } from 'lucide-react';
-import { Order } from '../types';
+import { ShoppingBag, Store, Bell, Volume2, Shield, ExternalLink, Folder, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { Order, DepartmentManager, AuthRole } from '../types';
 import { playOrderNotificationSound, requestBrowserNotificationPermission } from '../utils/notificationSound';
 
 interface HeaderProps {
@@ -13,6 +13,12 @@ interface HeaderProps {
   unreadCount?: number;
   recentOrders?: Order[];
   onClearUnread?: () => void;
+  onOpenJoinUs?: () => void;
+  // Department Manager Auth
+  activeRole?: AuthRole | null;
+  activeManager?: DepartmentManager | null;
+  onOpenPortal?: () => void;
+  onLogoutManager?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,7 +30,12 @@ export const Header: React.FC<HeaderProps> = ({
   onGoHome,
   unreadCount = 0,
   recentOrders = [],
-  onClearUnread
+  onClearUnread,
+  onOpenJoinUs,
+  activeRole,
+  activeManager,
+  onOpenPortal,
+  onLogoutManager
 }) => {
   const [clickCount, setClickCount] = useState<number>(0);
   const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
@@ -32,10 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   );
 
-  // Single click goes home, secret triple click on logo opens admin modal
+  // Single click goes home, secret triple click on logo opens login modal
   const handleLogoClick = () => {
     if (onGoHome) onGoHome();
-    if (isAdmin) return;
+    if (isAdmin || activeManager) return;
     const newCount = clickCount + 1;
     if (newCount >= 3) {
       onOpenAdmin();
@@ -62,12 +73,12 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 bg-emerald-700 text-white shadow-md border-b border-emerald-800">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between relative">
         
-        {/* Brand / Logo (Triple-click opens admin login quietly) */}
+        {/* Brand / Logo (Triple-click opens login quietly) */}
         <div 
           onClick={handleLogoClick}
           className="flex items-center gap-2.5 cursor-pointer select-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-inner">
             <Store className="w-6 h-6 text-emerald-200" />
           </div>
           <div>
@@ -81,20 +92,89 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+
+          {/* Department Manager Active Badge & Portal Link */}
+          {activeManager && (
+            <div className="flex items-center gap-1 bg-emerald-900/80 border border-emerald-500/50 p-1 pl-2 rounded-xl text-xs">
+              <button
+                onClick={onOpenPortal}
+                className="flex items-center gap-1.5 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors shadow-2xs"
+                title="فتح لوحة تحكم القسم"
+              >
+                <Folder className="w-3.5 h-3.5 text-emerald-200" />
+                <span className="hidden sm:inline">قسم:</span>
+                <span className="max-w-[90px] sm:max-w-[120px] truncate">{activeManager.department_name}</span>
+              </button>
+
+              <button
+                onClick={onLogoutManager}
+                className="p-1 text-emerald-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                title="تسجيل الخروج من القسم"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Super Admin Active Badge */}
+          {isAdmin && !activeManager && (
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 pl-2 rounded-xl text-xs">
+              <button
+                onClick={onOpenAdmin}
+                className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-lg transition-colors shadow-2xs"
+                title="لوحة الإدارة الرئيسية"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <span>المدير العام</span>
+              </button>
+
+              <button
+                onClick={onLogoutAdmin}
+                className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                title="الخروج من الإدارة"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Join Us Button */}
+          {onOpenJoinUs && !isAdmin && !activeManager && (
+            <button
+              onClick={onOpenJoinUs}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-xs border border-amber-300 transition-all hover:scale-105"
+              title="انضم إلى الموقع واعرض منتجاتك"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-slate-950" />
+              <span>انضم إلى الموقع</span>
+            </button>
+          )}
+
+          {/* Direct Login Button if not logged in */}
+          {!isAdmin && !activeManager && (
+            <button
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-800/60 hover:bg-emerald-800 text-emerald-200 hover:text-white text-xs font-bold rounded-xl border border-emerald-600/60 transition-colors"
+              title="دخول الإدارة أو مسؤولي الأقسام"
+            >
+              <LogIn className="w-3.5 h-3.5 text-emerald-300" />
+              <span className="hidden sm:inline">دخول الإدارة</span>
+            </button>
+          )}
 
           {/* Order Notifications Bell Icon */}
           <div className="relative">
             <button
               onClick={handleToggleNotifMenu}
-              className={`relative p-2.5 rounded-xl transition-all border ${
+              className={`relative p-2 sm:p-2.5 rounded-xl transition-all border ${
                 unreadCount > 0 
                   ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md animate-bounce' 
                   : 'bg-emerald-800/80 hover:bg-emerald-800 text-emerald-100 border-emerald-600'
               }`}
               title="إشعارات الطلبات الجديدة"
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-emerald-700 shadow-sm animate-pulse">
                   {unreadCount}
@@ -177,12 +257,16 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setIsNotifOpen(false);
-                      onOpenAdmin();
+                      if (activeManager) {
+                        if (onOpenPortal) onOpenPortal();
+                      } else {
+                        onOpenAdmin();
+                      }
                     }}
                     className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <Shield className="w-3.5 h-3.5 text-amber-400" />
-                    <span>الانتقال إلى لوحة التحكم والتأكيد</span>
+                    <span>{activeManager ? 'الانتقال إلى لوحة تحكم القسم' : 'الانتقال إلى لوحة التحكم'}</span>
                     <ExternalLink className="w-3.5 h-3.5 opacity-70" />
                   </button>
                 </div>
@@ -191,23 +275,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {isAdmin && (
-            <button
-              onClick={onLogoutAdmin}
-              className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-emerald-100 text-xs sm:text-sm font-medium transition-colors border border-emerald-600"
-            >
-              الخروج من الادمن
-            </button>
-          )}
-
           {/* Cart Button */}
           <button
             onClick={onOpenCart}
-            className="relative flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-900 font-bold px-3.5 py-2 rounded-xl transition-all shadow-sm"
+            className="relative flex items-center gap-1.5 sm:gap-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-900 font-bold px-3 sm:px-3.5 py-2 rounded-xl transition-all shadow-sm"
             aria-label="سلة الطلبات"
           >
-            <ShoppingBag className="w-5 h-5 text-slate-900" />
-            <span className="text-sm hidden xs:inline">الطلبات</span>
+            <ShoppingBag className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-slate-900" />
+            <span className="text-xs sm:text-sm hidden xs:inline">الطلبات</span>
             {cartCount > 0 && (
               <span className="bg-red-600 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 shadow-sm animate-pulse">
                 {cartCount}

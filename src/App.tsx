@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats, AdSlot } from './types';
+import { Product, Category, Order, CartItem, CustomerInfo, VisitorStats, AdSlot, DepartmentManager, AuthRole } from './types';
 import { 
   seedProductsIfEmpty, 
   seedCategoriesIfEmpty,
@@ -19,7 +19,9 @@ import { ProductModal } from './components/ProductModal';
 import { CartModal } from './components/CartModal';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { JoinUsModal } from './components/JoinUsModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { DepartmentManagerPortal } from './components/department/DepartmentManagerPortal';
 import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSection';
 import { NewOrderNotificationToast } from './components/NewOrderNotificationToast';
 import { DepartmentConflictModal } from './components/DepartmentConflictModal';
@@ -38,7 +40,8 @@ import {
   ArrowLeft,
   Grid,
   Package,
-  Layers
+  Layers,
+  UserPlus
 } from 'lucide-react';
 
 export default function App() {
@@ -63,6 +66,7 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [isJoinUsOpen, setIsJoinUsOpen] = useState<boolean>(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [completedOrderNum, setCompletedOrderNum] = useState<string | null>(null);
   const [lastCompletedOrderInfo, setLastCompletedOrderInfo] = useState<{ customer: CustomerInfo; items: CartItem[] } | null>(null);
@@ -72,10 +76,13 @@ export default function App() {
     attemptedProductName?: string;
   } | null>(null);
 
-  // Admin state
+  // Admin & Department Manager Auth State
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [departmentManager, setDepartmentManager] = useState<DepartmentManager | null>(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
-  const [activeView, setActiveView] = useState<'store' | 'admin'>('store');
+  const [initialLoginUsername, setInitialLoginUsername] = useState<string>('');
+  const [initialLoginRole, setInitialLoginRole] = useState<'admin' | 'department_manager'>('admin');
+  const [activeView, setActiveView] = useState<'store' | 'admin' | 'department_portal'>('store');
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -106,6 +113,13 @@ export default function App() {
     setActiveView('admin');
   };
 
+  const navigateToDepartmentPortal = () => {
+    if (window.location.pathname !== '/portal') {
+      window.history.pushState(null, '', '/portal');
+    }
+    setActiveView('department_portal');
+  };
+
   const navigateToHome = () => {
     if (window.location.pathname !== '/') {
       window.history.pushState(null, '', '/');
@@ -118,6 +132,7 @@ export default function App() {
     const pathname = window.location.pathname;
     const search = window.location.search;
     const hash = window.location.hash;
+    const urlParams = new URLSearchParams(search);
 
     const savedAdminAuth =
       sessionStorage.getItem('admin_logged_in') === 'true' ||
@@ -127,9 +142,41 @@ export default function App() {
       setIsAdminLoggedIn(true);
     }
 
-    if (pathname.startsWith('/admin') || search.includes('admin') || hash.includes('admin')) {
+    // Check Department Manager cached session
+    const cachedManagerStr = sessionStorage.getItem('dept_manager_session') || localStorage.getItem('dept_manager_session');
+    let loadedManager: DepartmentManager | null = null;
+    if (cachedManagerStr) {
+      try {
+        loadedManager = JSON.parse(cachedManagerStr);
+        setDepartmentManager(loadedManager);
+      } catch {
+        loadedManager = null;
+      }
+    }
+
+    // Check for WhatsApp Invite URL parameters (e.g. ?dept_user=food_123 or ?invite=... or ?login=manager)
+    const deptUserParam = urlParams.get('dept_user') || urlParams.get('user') || urlParams.get('manager');
+    const isLoginParam = urlParams.get('login') === 'manager' || urlParams.get('invite') !== null;
+
+    if (deptUserParam || isLoginParam) {
+      setInitialLoginUsername(deptUserParam || '');
+      setInitialLoginRole('department_manager');
+      setIsAdminModalOpen(true);
+      return;
+    }
+
+    if (pathname.startsWith('/portal') || pathname.startsWith('/department')) {
+      if (loadedManager || departmentManager) {
+        setActiveView('department_portal');
+      } else {
+        setInitialLoginRole('department_manager');
+        setIsAdminModalOpen(true);
+        setActiveView('store');
+      }
+    } else if (pathname.startsWith('/admin') || search.includes('admin') || hash.includes('admin')) {
       setActiveView('admin');
       if (!savedAdminAuth) {
+        setInitialLoginRole('admin');
         setIsAdminModalOpen(true);
       }
     } else if (pathname.startsWith('/category/')) {
@@ -143,7 +190,6 @@ export default function App() {
         setActiveView('store');
       }
     } else {
-      const urlParams = new URLSearchParams(search);
       const catQuery = urlParams.get('category');
       if (catQuery) {
         setSelectedCategory(catQuery);
@@ -283,9 +329,24 @@ export default function App() {
     navigateToHome();
   };
 
+  // Department Manager Auth Handlers
+  const handleManagerLoginSuccess = (manager: DepartmentManager) => {
+    setDepartmentManager(manager);
+    sessionStorage.setItem('dept_manager_session', JSON.stringify(manager));
+    localStorage.setItem('dept_manager_session', JSON.stringify(manager));
+    navigateToDepartmentPortal();
+  };
+
+  const handleManagerLogout = () => {
+    setDepartmentManager(null);
+    sessionStorage.removeItem('dept_manager_session');
+    localStorage.removeItem('dept_manager_session');
+    navigateToHome();
+  };
+
   const handleCloseAdminModal = () => {
     setIsAdminModalOpen(false);
-    if (!isAdminLoggedIn && window.location.pathname.startsWith('/admin')) {
+    if (!isAdminLoggedIn && !departmentManager && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/portal'))) {
       navigateToHome();
     }
   };
@@ -475,6 +536,7 @@ export default function App() {
               navigateToAdmin();
             }
           } else {
+            setInitialLoginRole('admin');
             setIsAdminModalOpen(true);
           }
         }}
@@ -483,18 +545,40 @@ export default function App() {
         unreadCount={unreadOrdersCount}
         recentOrders={orders}
         onClearUnread={() => setUnreadOrdersCount(0)}
+        onOpenJoinUs={() => setIsJoinUsOpen(true)}
+        activeRole={isAdminLoggedIn ? 'admin' : departmentManager ? 'department_manager' : null}
+        activeManager={departmentManager}
+        onOpenPortal={() => {
+          if (activeView === 'department_portal') {
+            navigateToHome();
+          } else {
+            navigateToDepartmentPortal();
+          }
+        }}
+        onLogoutManager={handleManagerLogout}
       />
 
       {/* Top Banner Ad Slot */}
       <AdRenderer placement="header_top" ads={ads} className="max-w-6xl mx-auto px-4 pt-3" />
 
       {/* Main Content View Switcher */}
-      {isAdminLoggedIn && activeView === 'admin' ? (
+      {departmentManager && activeView === 'department_portal' ? (
+        <DepartmentManagerPortal
+          manager={departmentManager}
+          categories={categories}
+          onLogout={handleManagerLogout}
+          onGoHome={navigateToHome}
+        />
+      ) : isAdminLoggedIn && activeView === 'admin' ? (
         <AdminDashboard
           products={allProductsAdmin}
           categories={categories}
           orders={orders}
           visitorStats={visitorStats}
+          onLoginAsManager={(mgr) => {
+            setDepartmentManager(mgr);
+            setActiveView('department_portal');
+          }}
         />
       ) : (
         <main className="max-w-6xl mx-auto px-4 py-6 space-y-8 pb-20">
@@ -952,6 +1036,30 @@ export default function App() {
             </div>
           )}
 
+          {/* Join Us Banner Section for Merchants & Sellers */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-5 sm:p-6 border border-slate-700/60 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1.5 text-center sm:text-right">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>فرصة للتجار وأصحاب الأنشطة</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white">
+                هل لديك منتجات وتريد فتح قسمك الخاص على موقعنا؟
+              </h3>
+              <p className="text-xs text-slate-300 max-w-xl">
+                قدّم طلب انضمامك الآن عبر إدخال اسمك ورقم الواتساب ونوع عملك، وستصلك دعوة فورية ببيانات الدخول ولوحة تحكم مخصصة لإدارة منتجاتك ومبيعاتك.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsJoinUsOpen(true)}
+              className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-md transition-all hover:scale-105 shrink-0 flex items-center gap-2"
+            >
+              <UserPlus className="w-4 h-4 text-slate-950" />
+              <span>انضم إلى الموقع الآن</span>
+            </button>
+          </div>
+
           {/* Public Pending Orders Section */}
           <PendingOrdersPublicSection orders={orders} />
 
@@ -1047,6 +1155,12 @@ export default function App() {
         isOpen={isAdminModalOpen}
         onClose={handleCloseAdminModal}
         onLoginSuccess={handleAdminLoginSuccess}
+      />
+
+      <JoinUsModal
+        isOpen={isJoinUsOpen}
+        onClose={() => setIsJoinUsOpen(false)}
+        categories={categories}
       />
 
       <DepartmentConflictModal

@@ -69,7 +69,58 @@ export interface VisitorStats {
   daily_history?: DailyVisit[];
 }
 
-export type AdminTab = 'dashboard' | 'visitors' | 'products' | 'categories' | 'current_orders' | 'order_history' | 'ads' | 'whatsapp_settings';
+export type AdminTab = 
+  | 'dashboard' 
+  | 'visitors' 
+  | 'products' 
+  | 'categories' 
+  | 'current_orders' 
+  | 'order_history' 
+  | 'ads' 
+  | 'whatsapp_settings'
+  | 'department_managers'
+  | 'join_requests';
+
+export type JoinRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface JoinRequest {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string; // WhatsApp number
+  work_type: string; // Profession, business, or category interest
+  wilaya?: string;
+  notes?: string;
+  status: JoinRequestStatus;
+  created_at: string;
+  reviewed_at?: string;
+  assigned_username?: string;
+  assigned_password?: string;
+  assigned_category_id?: string;
+  assigned_category_name?: string;
+  invitation_sent_at?: string;
+}
+
+export interface DepartmentManager {
+  id: string;
+  category_id: string;
+  category_name?: string;
+  manager_name: string;
+  phone: string; // WhatsApp contact phone for the manager
+  username: string; // Login username or phone
+  password_plain: string; // Password / PIN for manager login & invite generation
+  is_active: boolean;
+  created_at: string;
+  last_login_at?: string;
+  notes?: string;
+}
+
+export type AuthRole = 'admin' | 'department_manager' | null;
+
+export interface AuthSession {
+  role: 'admin' | 'department_manager';
+  manager?: DepartmentManager;
+}
 
 export type AdPlacement = 
   | 'header_top' 

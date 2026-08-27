@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats, AdSlot } from '../../types';
+import { Product, Order, OrderStatus, AdminTab, Category, VisitorStats, AdSlot, DepartmentManager, JoinRequest } from '../../types';
 import { 
   addProduct, 
   updateProduct, 
@@ -12,10 +12,14 @@ import {
   updateCategory,
   deleteCategory,
   restoreDefaultData,
-  subscribeToAds
+  subscribeToAds,
+  subscribeToDepartmentManagers,
+  subscribeToJoinRequests
 } from '../../services/storeService';
 import { normalizeAlgerianWhatsAppNumber } from '../../utils/whatsappOrder';
 import { AdsManagerTab } from './AdsManagerTab';
+import { DepartmentManagersTab } from './DepartmentManagersTab';
+import { JoinRequestsTab } from './JoinRequestsTab';
 import { 
   LayoutDashboard, 
   Package, 
@@ -41,6 +45,7 @@ import {
   Tag,
   FolderPlus,
   Users,
+  UserPlus,
   TrendingUp,
   BarChart2,
   Activity,
@@ -78,6 +83,7 @@ interface AdminDashboardProps {
   categories: Category[];
   orders: Order[];
   visitorStats?: VisitorStats | null;
+  onLoginAsManager?: (manager: DepartmentManager) => void;
 }
 
 // Preset library of curated product images
@@ -145,12 +151,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
   categories,
   orders,
-  visitorStats
+  visitorStats,
+  onLoginAsManager
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Department Managers & Invitations State
+  const [managers, setManagers] = useState<DepartmentManager[]>([]);
+
+  useEffect(() => {
+    const unsubManagers = subscribeToDepartmentManagers((managerItems) => {
+      setManagers(managerItems);
+    });
+    return () => {
+      unsubManagers();
+    };
+  }, []);
+
+  // Join Requests State
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+
+  useEffect(() => {
+    const unsubJoin = subscribeToJoinRequests((requests) => {
+      setJoinRequests(requests);
+    });
+    return () => {
+      unsubJoin();
+    };
+  }, []);
 
   // Submitting and compressing states
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
@@ -627,6 +658,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="w-full bg-slate-800 text-white font-bold text-xs py-2.5 px-3 rounded-xl border border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 appearance-none text-right"
               >
                 <option value="dashboard">📊 لوحة التحكم الرئيسية</option>
+                <option value="join_requests">✨ طلبات الانضمام للموقع ({joinRequests.filter(r => r.status === 'pending').length} جديد)</option>
+                <option value="department_managers">👥 مسؤولو ودعوات الأقسام ({managers.length})</option>
                 <option value="ads">📢 إدارة الإعلانات وبنرات HTML ({ads.filter(a => a.is_active).length} نشط)</option>
                 <option value="products">📦 المنتجات ({products.length})</option>
                 <option value="categories">🗂️ الأقسام ({categories.length})</option>
@@ -654,6 +687,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <LayoutDashboard className="w-4 h-4 text-emerald-400" />
               <span>الرئيسية</span>
+            </button>
+
+            {/* Join Requests Tab */}
+            <button
+              onClick={() => setActiveTab('join_requests')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 relative ${
+                activeTab === 'join_requests'
+                  ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-300'
+                  : 'bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50'
+              }`}
+            >
+              <UserPlus className="w-4 h-4 text-amber-400" />
+              <span>طلبات الانضمام</span>
+              {joinRequests.filter(r => r.status === 'pending').length > 0 ? (
+                <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse shadow-xs">
+                  {joinRequests.filter(r => r.status === 'pending').length} جديد
+                </span>
+              ) : (
+                <span className="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                  {joinRequests.length}
+                </span>
+              )}
+            </button>
+
+            {/* Department Managers & Invitations Tab */}
+            <button
+              onClick={() => setActiveTab('department_managers')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
+                activeTab === 'department_managers'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400/40'
+                  : 'bg-teal-950/40 text-teal-300 border border-teal-500/30 hover:bg-teal-900/50'
+              }`}
+            >
+              <Users className="w-4 h-4 text-teal-400" />
+              <span>مسؤولو الأقسام والدعوات</span>
+              <span className="bg-teal-400 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+                {managers.length}
+              </span>
             </button>
 
             {/* Prominent Ads Tab */}
@@ -808,6 +879,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-xs text-slate-500">متابعة فورية للطلبات المباشرة والمبيعات بالدينار الجزائري</p>
               </div>
             </div>
+
+            {/* Pending Join Requests Alert Callout */}
+            {joinRequests.filter(r => r.status === 'pending').length > 0 && (
+              <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 p-4 sm:p-5 rounded-2xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black text-xl shrink-0">
+                    ✨
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm text-slate-950">
+                      يوجد {joinRequests.filter(r => r.status === 'pending').length} طلبات انضمام جديدة للموقع بانتظار المراجعة!
+                    </h3>
+                    <p className="text-xs text-slate-900 font-medium">
+                      يمكنك مراجعة بياناتهم وإرسال دعوات الدخول وحسابات مدراء الأقسام لهم عبر WhatsApp فوراً.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('join_requests')}
+                  className="px-4 py-2 bg-slate-950 hover:bg-slate-900 text-amber-300 font-black text-xs rounded-xl shadow-xs transition-all hover:scale-105 shrink-0 flex items-center gap-1.5 self-end sm:self-center"
+                >
+                  <UserPlus className="w-4 h-4 text-amber-300" />
+                  <span>معاينة وإرسال الدعوات</span>
+                </button>
+              </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
@@ -2187,6 +2285,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: JOIN REQUESTS */}
+        {activeTab === 'join_requests' && (
+          <JoinRequestsTab
+            requests={joinRequests}
+            categories={categories}
+            managers={managers}
+          />
+        )}
+
+        {/* TAB: DEPARTMENT MANAGERS & INVITATIONS */}
+        {activeTab === 'department_managers' && (
+          <DepartmentManagersTab
+            managers={managers}
+            categories={categories}
+            onLoginAsManager={onLoginAsManager}
+          />
         )}
 
         {/* TAB: ADS & HTML MANAGEMENT */}
