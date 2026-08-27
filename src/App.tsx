@@ -566,8 +566,11 @@ export default function App() {
         <DepartmentManagerPortal
           manager={departmentManager}
           categories={categories}
+          products={allProductsAdmin}
+          orders={orders}
           onLogout={handleManagerLogout}
           onGoHome={navigateToHome}
+          onGoToStore={navigateToHome}
         />
       ) : isAdminLoggedIn && activeView === 'admin' ? (
         <AdminDashboard
