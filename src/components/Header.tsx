@@ -139,15 +139,16 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Join Us Button */}
-          {onOpenJoinUs && !isAdmin && !activeManager && (
+          {/* Join Us Button - Always visible & prominent */}
+          {onOpenJoinUs && (
             <button
               onClick={onOpenJoinUs}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-xs border border-amber-300 transition-all hover:scale-105"
-              title="انضم إلى الموقع واعرض منتجاتك"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-md border border-amber-200 transition-all hover:scale-105 active:scale-95 shrink-0"
+              title="انضم إلى الموقع واعرض منتجاتك وافتح قسمك"
             >
-              <UserPlus className="w-3.5 h-3.5 text-slate-950" />
-              <span>انضم إلى الموقع</span>
+              <UserPlus className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+              <span className="hidden xs:inline">انضم إلى الموقع</span>
+              <span className="xs:hidden">انضم إلينا</span>
             </button>
           )}
 

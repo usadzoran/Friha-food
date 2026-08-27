@@ -614,6 +614,17 @@ export default function App() {
                   <span>منتجات مضمونة</span>
                 </div>
               </div>
+
+              {/* Prominent Hero Join Us CTA Button */}
+              <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={() => setIsJoinUsOpen(true)}
+                  className="px-4 py-2.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg border border-amber-200 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                  <span>✨ انضم إلى الموقع كتاجر وافتح قسمك التجاري</span>
+                </button>
+              </div>
             </div>
 
             {/* Subtle background element */}
@@ -696,35 +707,46 @@ export default function App() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
                 
                 {/* View Mode Toggle Buttons */}
-                <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
-                  <button
-                    onClick={() => setHomeTab('categories')}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      homeTab === 'categories'
-                        ? 'bg-white text-emerald-800 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Grid className="w-4 h-4 text-emerald-600" />
-                    <span>أقسام المتجر</span>
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">
-                      {categories.length}
-                    </span>
-                  </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      onClick={() => setHomeTab('categories')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        homeTab === 'categories'
+                          ? 'bg-white text-emerald-800 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Grid className="w-4 h-4 text-emerald-600" />
+                      <span>أقسام المتجر</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">
+                        {categories.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setHomeTab('all_products')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        homeTab === 'all_products'
+                          ? 'bg-white text-emerald-800 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Package className="w-4 h-4 text-emerald-600" />
+                      <span>جميع المنتجات</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">
+                        {products.length}
+                      </span>
+                    </button>
+                  </div>
 
                   <button
-                    onClick={() => setHomeTab('all_products')}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      homeTab === 'all_products'
-                        ? 'bg-white text-emerald-800 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={() => setIsJoinUsOpen(true)}
+                    className="px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs border border-amber-300 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shrink-0"
+                    title="طلب فتح قسم جديد وعرض منتجاتك"
                   >
-                    <Package className="w-4 h-4 text-emerald-600" />
-                    <span>جميع المنتجات</span>
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">
-                      {products.length}
-                    </span>
+                    <UserPlus className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                    <span>طلب فتح قسم / انضمام</span>
                   </button>
                 </div>
 
@@ -844,6 +866,39 @@ export default function App() {
                           </div>
                         </div>
                       )}
+
+                      {/* Interactive Join Us Card for Merchants */}
+                      <div
+                        onClick={() => setIsJoinUsOpen(true)}
+                        className="group relative bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl border-2 border-dashed border-amber-400/70 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99] p-5 sm:p-6"
+                      >
+                        <div className="space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center border border-amber-400/40 shadow-inner">
+                            <UserPlus className="w-6 h-6 text-amber-400" />
+                          </div>
+                          <div>
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 mb-1.5 shadow-2xs">
+                              فرصة للتجار وأصحاب المشاريع
+                            </span>
+                            <h3 className="text-lg sm:text-xl font-black text-white leading-snug">
+                              هل تريد فتح قسم وعرض منتجاتك؟
+                            </h3>
+                            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                              انضم إلينا الآن، وسننشئ لك قسماً خاصاً مع لوحة تحكم مخصصة لإدارة منتجاتك ومبيعاتك عبر واتساب.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between">
+                          <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                            <span>قدّم طلب انضمامك الآن</span>
+                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                          </span>
+                          <span className="text-[11px] font-bold bg-amber-400/20 text-amber-200 border border-amber-400/40 px-2.5 py-1 rounded-lg">
+                            مجاناً وفوري
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Section: Latest Products Showcase on Home Page */}
@@ -1154,7 +1209,11 @@ export default function App() {
       <AdminLoginModal
         isOpen={isAdminModalOpen}
         onClose={handleCloseAdminModal}
-        onLoginSuccess={handleAdminLoginSuccess}
+        onAdminLoginSuccess={handleAdminLoginSuccess}
+        onManagerLoginSuccess={handleManagerLoginSuccess}
+        onOpenJoinUs={() => setIsJoinUsOpen(true)}
+        initialUsername={initialLoginUsername}
+        initialRole={initialLoginRole}
       />
 
       <JoinUsModal
@@ -1187,6 +1246,22 @@ export default function App() {
           }
         }}
       />
+
+      {/* Floating Join Us Quick Button */}
+      {activeView !== 'admin' && activeView !== 'department_portal' && (
+        <button
+          onClick={() => setIsJoinUsOpen(true)}
+          className="fixed bottom-5 left-4 sm:left-6 z-40 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-3.5 sm:px-4 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl border-2 border-white flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          title="انضم إلى الموقع وافتح قسمك التجاري"
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-600 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-700"></span>
+          </span>
+          <UserPlus className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+          <span>انضم إلى الموقع</span>
+        </button>
+      )}
 
     </div>
   );
