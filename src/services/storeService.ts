@@ -193,7 +193,7 @@ export async function addCategory(category: Omit<Category, 'id'>): Promise<strin
 }
 
 // Update Category (Admin)
-export async function updateCategory(id: string, updates: Partial<Category>): Promise<void> {
+export async function updateCategory(id: string, updates: Partial<Category>): Promise<Category> {
   return updateCategorySupabase(id, updates);
 }
 

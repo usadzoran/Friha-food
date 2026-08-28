@@ -35,7 +35,7 @@ export async function getCategoriesSupabase(): Promise<Category[]> {
   return (data as Category[]) || [];
 }
 
-export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Category | null> {
+export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Category> {
   if (!supabase) {
     throw new Error('لم يتم تهيئة اتصال Supabase بنجاح');
   }
@@ -51,58 +51,65 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
     created_at: cat.created_at || new Date().toISOString()
   };
 
-  let { data, error } = await supabase
+  console.log('[Supabase addCategorySupabase] Inserting category payload:', payload);
+
+  const { data, error } = await supabase
     .from('categories')
     .insert([payload])
     .select()
     .single();
 
-  if (error && (error.code === 'PGRST204' || error.message?.includes('whatsapp_number'))) {
-    delete payload.whatsapp_number;
-    const fallbackRes = await supabase
-      .from('categories')
-      .insert([payload])
-      .select()
-      .single();
-    data = fallbackRes.data;
-    error = fallbackRes.error;
-  }
-
   if (error) {
     console.error('Supabase error adding category:', error);
-    throw new Error(error.message);
+    if (error.code === 'PGRST204' || error.message?.includes('whatsapp_number')) {
+      throw new Error(`تعذر إضافة القسم برقم WhatsApp: عمود whatsapp_number غير موجود في جدول categories في قاعدة البيانات. يرجى تنفيذ ملف supabase_whatsapp_schema.sql في Supabase SQL Editor.`);
+    }
+    throw new Error(`فشل إضافة القسم في Supabase: ${error.message}`);
   }
 
-  return {
-    ...(data as Category),
-    whatsapp_number: whatsappNum
-  };
+  if (!data) {
+    throw new Error('فشل إضافة القسم: لم يتم إرجاع بيانات السجل من Supabase');
+  }
+
+  return data as Category;
 }
 
-export async function updateCategorySupabase(id: string, updates: Partial<Category>): Promise<void> {
+export async function updateCategorySupabase(id: string, updates: Partial<Category>): Promise<Category> {
   if (!supabase) {
     throw new Error('لم يتم تهيئة اتصال Supabase بنجاح');
   }
-  const payload: any = { ...updates };
+  if (!id || !id.trim()) {
+    throw new Error('معرف القسم (categoryId) غير صالح أو فارغ');
+  }
 
-  let { error } = await supabase
+  const payload: Record<string, any> = {};
+  if (updates.name !== undefined) payload.name = updates.name.trim();
+  if (updates.icon !== undefined) payload.icon = updates.icon;
+  if (updates.image_url !== undefined) payload.image_url = updates.image_url;
+  if (updates.whatsapp_number !== undefined) payload.whatsapp_number = updates.whatsapp_number.trim();
+
+  console.log('[Supabase updateCategorySupabase] Updating category:', { categoryId: id, payload });
+
+  const { data, error } = await supabase
     .from('categories')
     .update(payload)
-    .eq('id', id);
-
-  if (error && (error.code === 'PGRST204' || error.message?.includes('whatsapp_number'))) {
-    delete payload.whatsapp_number;
-    const fallbackRes = await supabase
-      .from('categories')
-      .update(payload)
-      .eq('id', id);
-    error = fallbackRes.error;
-  }
+    .eq('id', id)
+    .select()
+    .single();
 
   if (error) {
     console.error('Supabase error updating category:', error);
-    throw new Error(error.message);
+    if (error.code === 'PGRST204' || error.message?.includes('whatsapp_number')) {
+      throw new Error(`تعذر تحديث رقم WhatsApp للقسم: عمود whatsapp_number غير موجود في جدول categories في Supabase. يرجى تنفيذ ملف supabase_whatsapp_schema.sql في Supabase SQL Editor.`);
+    }
+    throw new Error(`فشل تحديث بيانات القسم في Supabase: ${error.message}`);
   }
+
+  if (!data) {
+    throw new Error(`لم يتم العثور على القسم بالمعرف (${id}) أو لم يتم تحديث أي صف في Supabase`);
+  }
+
+  return data as Category;
 }
 
 export async function deleteCategorySupabase(id: string): Promise<void> {
@@ -121,20 +128,37 @@ export async function deleteCategorySupabase(id: string): Promise<void> {
 }
 
 // WhatsApp Number specific update in Supabase
-export async function saveCategoryWhatsappNumber(categoryId: string, phone: string): Promise<void> {
+export async function saveCategoryWhatsappNumber(categoryId: string, phone: string): Promise<Category> {
   if (!supabase) {
     throw new Error('لم يتم تهيئة اتصال Supabase بنجاح');
   }
+  if (!categoryId || !categoryId.trim()) {
+    throw new Error('معرف القسم (categoryId) غير صالح أو فارغ');
+  }
+
   const cleanPhone = (phone || '').trim();
-  const { error } = await supabase
+  console.log('[Supabase saveCategoryWhatsappNumber] Saving category WhatsApp:', { categoryId, cleanPhone });
+
+  const { data, error } = await supabase
     .from('categories')
     .update({ whatsapp_number: cleanPhone })
-    .eq('id', categoryId);
+    .eq('id', categoryId)
+    .select()
+    .single();
 
   if (error) {
     console.error('Supabase error updating category whatsapp_number:', error);
-    throw new Error(error.message);
+    if (error.code === 'PGRST204' || error.message?.includes('whatsapp_number')) {
+      throw new Error(`تعذر حفظ رقم WhatsApp: عمود whatsapp_number غير موجود في جدول categories في قاعدة البيانات. يرجى تنفيذ ملف supabase_whatsapp_schema.sql في Supabase SQL Editor.`);
+    }
+    throw new Error(`فشل حفظ رقم WhatsApp في Supabase: ${error.message}`);
   }
+
+  if (!data) {
+    throw new Error(`لم يتم العثور على القسم بالمعرف (${categoryId}) في Supabase أو لم يتم تحديث أي صف`);
+  }
+
+  return data as Category;
 }
 
 export async function syncCategoryWhatsAppFromServer(): Promise<Record<string, string>> {

@@ -11,6 +11,7 @@ import {
   addCategory,
   updateCategory,
   deleteCategory,
+  saveCategoryWhatsappNumber,
   restoreDefaultData,
   subscribeToAds,
   subscribeToDepartmentManagers,
@@ -231,6 +232,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Ads State
   const [ads, setAds] = useState<AdSlot[]>([]);
 
+  // Category WhatsApp Saving State
+  const [savingCatPhoneId, setSavingCatPhoneId] = useState<string | null>(null);
+  const [catPhoneErrors, setCatPhoneErrors] = useState<Record<string, string>>({});
+  const [showSqlMigrationGuide, setShowSqlMigrationGuide] = useState<boolean>(false);
+
   // Order Deletion States
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [isDeletingAllDelivered, setIsDeletingAllDelivered] = useState(false);
@@ -399,35 +405,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setIsSubmittingCategory(true);
       const finalImage = catForm.image_url.trim() || PRESET_IMAGES[0].url;
 
-      // Clean & normalize WhatsApp phone number
-      let rawPhone = catForm.whatsapp_number.trim();
-      let normalizedPhone = rawPhone.replace(/[^\d+]/g, '');
-      if (normalizedPhone.startsWith('+')) {
-        normalizedPhone = normalizedPhone.substring(1);
-      }
-      if (normalizedPhone.startsWith('00')) {
-        normalizedPhone = normalizedPhone.substring(2);
-      }
-      if (normalizedPhone.startsWith('0') && normalizedPhone.length >= 9) {
-        normalizedPhone = '213' + normalizedPhone.substring(1);
-      }
+      // Clean WhatsApp phone number as raw string
+      const cleanPhone = catForm.whatsapp_number.trim();
 
       if (editingCategory) {
         await updateCategory(editingCategory.id, {
           name: catForm.name.trim(),
           icon: catForm.icon,
           image_url: finalImage,
-          whatsapp_number: normalizedPhone
+          whatsapp_number: cleanPhone
         });
-        setSuccessNotice('تم تعديل القسم وتحديث رقم WhatsApp الخاص به والمزامنة بنجاح!');
+        setSuccessNotice('تم تعديل القسم وتحديث رقم WhatsApp الخاص به في Supabase بنجاح!');
       } else {
         await addCategory({
           name: catForm.name.trim(),
           icon: catForm.icon,
           image_url: finalImage,
-          whatsapp_number: normalizedPhone
+          whatsapp_number: cleanPhone
         });
-        setSuccessNotice('تم إضافة القسم الجديد ورقم WhatsApp بنجاح!');
+        setSuccessNotice('تم إضافة القسم الجديد ورقم WhatsApp في Supabase بنجاح!');
       }
 
       setTimeout(() => setSuccessNotice(null), 5000);
@@ -2116,23 +2112,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm">أرقام WhatsApp المسجلة للأقسام ({categories.length} قسم)</h3>
-                      <p className="text-[11px] text-slate-400">حدد رقم WhatsApp لكل قسم لاستقبال الطلبات مباشرة بدون وسيط</p>
+                      <p className="text-[11px] text-slate-400">حدد رقم WhatsApp لكل قسم لاستقبال الطلبات مباشرة وتخزينه في Supabase</p>
                     </div>
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                       {categories.filter(c => Boolean((c.whatsapp_number || '').trim())).length} من {categories.length} مكتمل
                     </span>
                   </div>
 
+                  {showSqlMigrationGuide && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2 text-amber-900">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>كود SQL لإضافة عمود whatsapp_number إلى Supabase:</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700 leading-relaxed">
+                        إذا ظهر خطأ متعلق بعدم وجود العمود في قاعدة البيانات، قم بنسخ هذا الأمر وتنفيذه في <strong>Supabase Dashboard &gt; SQL Editor</strong>:
+                      </p>
+                      <pre className="bg-slate-900 text-emerald-400 p-2.5 rounded-lg text-[11px] font-mono overflow-x-auto select-all" dir="ltr">
+{`ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all on categories" ON public.categories;
+CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);`}
+                      </pre>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {categories.map((category) => {
                       const hasPhone = Boolean((category.whatsapp_number || '').trim());
                       const normalized = hasPhone ? normalizeAlgerianWhatsAppNumber(category.whatsapp_number || '') : '';
                       const prodsInCat = products.filter(p => p.category_id === category.id);
+                      const isSavingThis = savingCatPhoneId === category.id;
+                      const catError = catPhoneErrors[category.id];
 
                       return (
                         <div
                           key={category.id}
-                          className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-emerald-300 transition-all space-y-3"
+                          className={`p-4 rounded-xl border transition-all space-y-3 ${
+                            catError 
+                              ? 'border-rose-300 bg-rose-50/30' 
+                              : 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-emerald-300'
+                          }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-3">
@@ -2152,7 +2172,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               )}
                               <div>
                                 <h4 className="font-bold text-slate-800 text-sm">{category.name}</h4>
-                                <span className="text-[11px] text-slate-400">{prodsInCat.length} منتج مسجل</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-400">{prodsInCat.length} منتج مسجل</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">ID: {category.id}</span>
+                                </div>
                               </div>
                             </div>
 
@@ -2181,22 +2204,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
 
                             <button
+                              disabled={isSavingThis}
                               onClick={async () => {
                                 const inputEl = document.getElementById(`cat-phone-${category.id}`) as HTMLInputElement;
                                 const val = inputEl ? inputEl.value.trim() : '';
+                                
+                                setSavingCatPhoneId(category.id);
+                                setCatPhoneErrors(prev => {
+                                  const next = { ...prev };
+                                  delete next[category.id];
+                                  return next;
+                                });
+
                                 try {
-                                  await updateCategory(category.id, {
-                                    whatsapp_number: val
+                                  console.log('[Admin WhatsApp Settings] Saving WhatsApp number for category:', {
+                                    categoryId: category.id,
+                                    categoryName: category.name,
+                                    whatsappNumber: val
                                   });
-                                  setSuccessNotice(`تم تحديث رقم WhatsApp لقسم "${category.name}" بنجاح!`);
-                                  setTimeout(() => setSuccessNotice(null), 3000);
+
+                                  await saveCategoryWhatsappNumber(category.id, val);
+                                  
+                                  setSuccessNotice(`تم حفظ رقم WhatsApp لقسم "${category.name}" في قاعدة بيانات Supabase بنجاح!`);
+                                  setTimeout(() => setSuccessNotice(null), 4000);
                                 } catch (err: any) {
-                                  alert('خطأ أثناء حفظ الرقم: ' + err?.message);
+                                  const msg = err?.message || 'حدث خطأ غير متوقع';
+                                  console.error('[Admin WhatsApp Settings] Error saving category phone:', err);
+                                  setCatPhoneErrors(prev => ({ ...prev, [category.id]: msg }));
+                                  
+                                  if (msg.includes('whatsapp_number') || msg.includes('PGRST204')) {
+                                    setShowSqlMigrationGuide(true);
+                                  }
+                                  alert(`خطأ أثناء حفظ رقم الواتساب: ${msg}`);
+                                } finally {
+                                  setSavingCatPhoneId(null);
                                 }
                               }}
-                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
                             >
-                              حفظ الرقم
+                              {isSavingThis ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  <span>جارِ الحفظ...</span>
+                                </>
+                              ) : (
+                                <span>حفظ الرقم</span>
+                              )}
                             </button>
 
                             {hasPhone && (
@@ -2213,6 +2266,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </button>
                             )}
                           </div>
+
+                          {catError && (
+                            <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-start gap-1.5">
+                              <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <strong className="block text-[11px]">فشل حفظ الرقم في Supabase:</strong>
+                                <span className="text-[10px] font-mono text-rose-700">{catError}</span>
+                              </div>
+                            </div>
+                          )}
 
                           {hasPhone && (
                             <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
