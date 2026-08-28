@@ -122,15 +122,18 @@ export async function deleteCategorySupabase(id: string): Promise<void> {
 
 // WhatsApp Number specific update in Supabase
 export async function saveCategoryWhatsappNumber(categoryId: string, phone: string): Promise<void> {
-  if (!supabase) return;
+  if (!supabase) {
+    throw new Error('لم يتم تهيئة اتصال Supabase بنجاح');
+  }
   const cleanPhone = (phone || '').trim();
-  try {
-    await supabase
-      .from('categories')
-      .update({ whatsapp_number: cleanPhone })
-      .or(`id.eq.${categoryId},name.eq.${categoryId}`);
-  } catch (err) {
-    console.warn('Could not update whatsapp_number on category:', err);
+  const { error } = await supabase
+    .from('categories')
+    .update({ whatsapp_number: cleanPhone })
+    .eq('id', categoryId);
+
+  if (error) {
+    console.error('Supabase error updating category whatsapp_number:', error);
+    throw new Error(error.message);
   }
 }
 
