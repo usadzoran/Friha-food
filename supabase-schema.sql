@@ -261,3 +261,18 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_order_messages;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+
+-- ====================================================================
+-- STORAGE BUCKETS & POLICIES (product-images)
+-- ====================================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('product-images', 'product-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Public Access product-images" ON storage.objects;
+    CREATE POLICY "Public Access product-images" ON storage.objects
+        FOR ALL USING (bucket_id = 'product-images') WITH CHECK (bucket_id = 'product-images');
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
