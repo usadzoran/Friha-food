@@ -64,10 +64,8 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
     categories.find(c => c.id === manager.category_id || c.name === manager.category_name) || {
       id: manager.category_id || 'general',
       name: manager.category_name || 'القسم التجاري',
-      slug: 'general',
       icon: 'Store',
-      display_order: 1,
-      active: true,
+      image_url: '',
       whatsapp_number: manager.phone || ''
     };
 
