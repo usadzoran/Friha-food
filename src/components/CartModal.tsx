@@ -236,23 +236,33 @@ export const CartModal: React.FC<CartModalProps> = ({
                 </div>
 
                 {/* Submit button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-base shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      <span>جاري فتح WhatsApp لإرسال الطلب...</span>
+                <div className="pt-2 space-y-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-3 py-2 rounded-xl">
+                    <span className="flex h-2 w-2 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
                     </span>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      <span>تأكيد الطلب وإرسال عبر WhatsApp</span>
-                    </>
-                  )}
-                </button>
+                    <span>يتم إرسال الطلبية مباشرة وتلقائياً إلى صاحب القسم عبر WhatsApp فور الضغط على الزر.</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-base shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>جاري توجيهك إلى WhatsApp صاحب القسم...</span>
+                      </span>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        <span>تأكيد الطلب وإرسال عبر WhatsApp</span>
+                      </>
+                    )}
+                  </button>
+                </div>
                 {/* Ad in Cart Modal */}
                 <AdRenderer placement="cart_modal_bottom" ads={ads} className="pt-2" />
               </form>

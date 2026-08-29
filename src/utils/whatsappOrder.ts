@@ -1,4 +1,4 @@
-import { CartItem, CustomerInfo } from '../types';
+import { CartItem, CustomerInfo, Category, DepartmentManager } from '../types';
 
 /**
  * Normalizes Algerian and international phone numbers for direct WhatsApp link (wa.me)
@@ -30,6 +30,34 @@ export function normalizeAlgerianWhatsAppNumber(rawPhone?: string): string {
   }
 
   return digits;
+}
+
+/**
+ * Resolves the target WhatsApp phone number for a department by checking
+ * the Category object and any active Department Manager assigned to it.
+ */
+export function resolveDepartmentWhatsAppNumber(
+  category?: Category | null,
+  managers?: DepartmentManager[]
+): string {
+  if (category?.whatsapp_number && category.whatsapp_number.trim()) {
+    return category.whatsapp_number.trim();
+  }
+
+  if (category && Array.isArray(managers) && managers.length > 0) {
+    const matchedManager = managers.find(
+      (m) =>
+        (m.is_active !== false) &&
+        (m.category_id === category.id ||
+         m.category_name?.trim() === category.name?.trim() ||
+         (category.id && m.category_id === category.id))
+    );
+    if (matchedManager?.phone && matchedManager.phone.trim()) {
+      return matchedManager.phone.trim();
+    }
+  }
+
+  return '';
 }
 
 /**
@@ -86,7 +114,7 @@ export function buildDepartmentWhatsAppMessage(params: {
 }
 
 /**
- * Builds the direct WhatsApp URL
+ * Builds the direct WhatsApp URL (wa.me)
  */
 export function buildWhatsAppDirectUrl(whatsappNumber: string, message: string): string {
   const cleanPhone = normalizeAlgerianWhatsAppNumber(whatsappNumber);
@@ -98,14 +126,24 @@ export function buildWhatsAppDirectUrl(whatsappNumber: string, message: string):
 
 /**
  * Directly launches WhatsApp on user's device with pre-filled message
+ * Automatically sends the order details to the department owner
  */
 export function openWhatsAppDirect(whatsappNumber: string, message: string): string {
   const url = buildWhatsAppDirectUrl(whatsappNumber, message);
   if (typeof window !== 'undefined') {
     try {
-      window.location.href = url;
+      // 1. Try window.open first
+      const openedWin = window.open(url, '_blank', 'noopener,noreferrer');
+      // 2. If blocked or running on mobile webview, trigger location href
+      if (!openedWin || openedWin.closed || typeof openedWin.closed === 'undefined') {
+        window.location.href = url;
+      }
     } catch {
-      window.open(url, '_blank');
+      try {
+        window.location.href = url;
+      } catch (err) {
+        console.warn('WhatsApp launch error:', err);
+      }
     }
   }
   return url;

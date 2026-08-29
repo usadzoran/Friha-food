@@ -10,7 +10,8 @@ import {
   createOrder,
   trackSiteVisit,
   subscribeToVisitorStats,
-  subscribeToAds
+  subscribeToAds,
+  subscribeToDepartmentManagers
 } from './services/storeService';
 
 import { Header } from './components/Header';
@@ -26,7 +27,7 @@ import { PendingOrdersPublicSection } from './components/PendingOrdersPublicSect
 import { NewOrderNotificationToast } from './components/NewOrderNotificationToast';
 import { DepartmentConflictModal } from './components/DepartmentConflictModal';
 import { AdRenderer } from './components/AdRenderer';
-import { buildDepartmentWhatsAppMessage, openWhatsAppDirect } from './utils/whatsappOrder';
+import { buildDepartmentWhatsAppMessage, openWhatsAppDirect, resolveDepartmentWhatsAppNumber } from './utils/whatsappOrder';
 import { playOrderNotificationSound, showBrowserNotification } from './utils/notificationSound';
 
 import { 
@@ -51,6 +52,7 @@ export default function App() {
   const [allProductsAdmin, setAllProductsAdmin] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [departmentManagers, setDepartmentManagers] = useState<DepartmentManager[]>([]);
   const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
   const [ads, setAds] = useState<AdSlot[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -326,6 +328,11 @@ export default function App() {
       setAds(adList);
     });
 
+    // Subscribe to department managers for phone number resolution
+    const unsubscribeManagers = subscribeToDepartmentManagers((managerList) => {
+      setDepartmentManagers(managerList);
+    });
+
     return () => {
       clearTimeout(loadingTimeout);
       window.removeEventListener('popstate', handlePopState);
@@ -336,6 +343,7 @@ export default function App() {
       unsubscribeOrders();
       unsubscribeVisitorStats();
       unsubscribeAds();
+      unsubscribeManagers();
     };
   }, []);
 
@@ -467,7 +475,10 @@ export default function App() {
       // 1. Save order to database
       const { displayOrderNum } = await createOrder(customer, itemsSnapshot);
 
-      // 2. Generate WhatsApp pre-filled message according to exact format
+      // 2. Resolve department WhatsApp target number (from category or department manager)
+      const targetPhone = resolveDepartmentWhatsAppNumber(deptCat, departmentManagers);
+
+      // 3. Generate WhatsApp pre-filled message according to exact format
       const messageText = buildDepartmentWhatsAppMessage({
         orderNumber: displayOrderNum,
         categoryName: deptCat.name,
@@ -476,10 +487,10 @@ export default function App() {
         totalPrice
       });
 
-      // 3. Open WhatsApp directly on customer device
-      openWhatsAppDirect(deptCat.whatsapp_number || '', messageText);
+      // 4. Open WhatsApp directly on customer device (sent immediately to department manager)
+      openWhatsAppDirect(targetPhone, messageText);
 
-      // 4. Update state, clear cart, close cart modal, open confirmation
+      // 5. Update state, clear cart, close cart modal, open confirmation
       setLastCompletedOrderInfo({
         customer: { ...customer },
         items: itemsSnapshot
@@ -1231,6 +1242,7 @@ export default function App() {
         customer={lastCompletedOrderInfo?.customer}
         orderedItems={lastCompletedOrderInfo?.items}
         categories={categories}
+        managers={departmentManagers}
         ads={ads}
       />
 
