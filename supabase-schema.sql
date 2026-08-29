@@ -209,57 +209,28 @@ END $$;
 -- REALTIME PUBLICATIONS SETUP
 -- ====================================================================
 DO $$
+DECLARE
+    tbl TEXT;
+    tables TEXT[] := ARRAY[
+        'categories',
+        'products',
+        'orders',
+        'order_items',
+        'department_managers',
+        'join_requests',
+        'ads',
+        'visitor_stats',
+        'whatsapp_order_messages'
+    ];
 BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.order_items;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.department_managers;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.join_requests;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.ads;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.visitor_stats;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$
-BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_order_messages;
-EXCEPTION WHEN OTHERS THEN NULL;
+    FOREACH tbl IN ARRAY tables
+    LOOP
+        BEGIN
+            EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
+        EXCEPTION WHEN OTHERS THEN
+            NULL;
+        END;
+    END LOOP;
 END $$;
 
 -- ====================================================================
