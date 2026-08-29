@@ -61,6 +61,10 @@ export default function App() {
   const [unreadOrdersCount, setUnreadOrdersCount] = useState<number>(0);
   const isInitialOrdersLoaded = useRef<boolean>(false);
   const knownOrderIds = useRef<Set<string>>(new Set());
+  const authStatusRef = useRef<{ isAdmin: boolean; isManager: boolean }>({
+    isAdmin: false,
+    isManager: false,
+  });
 
   // Cart & Modals state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -200,6 +204,14 @@ export default function App() {
     }
   };
 
+  // Keep authStatusRef synchronized
+  useEffect(() => {
+    authStatusRef.current = {
+      isAdmin: isAdminLoggedIn,
+      isManager: !!departmentManager,
+    };
+  }, [isAdminLoggedIn, departmentManager]);
+
   // 1. Initialize DB and Real-time listeners & route state
   useEffect(() => {
     // Seed initial products and categories if db is empty
@@ -277,13 +289,26 @@ export default function App() {
         if (newlyArrived.length > 0) {
           newlyArrived.forEach((o) => knownOrderIds.current.add(o.id));
           const newest = newlyArrived[0];
-          setLatestNewOrder(newest);
-          setUnreadOrdersCount((prev) => prev + newlyArrived.length);
-          playOrderNotificationSound();
-          showBrowserNotification(
-            `🔔 طلب جديد #DZ-${newest.id.slice(-6).toUpperCase()}!`,
-            `الزبون: ${newest.customer_name} | المجموع: ${(newest.total_price || (newest as any).total_amount || 0).toLocaleString('ar-DZ')} د.ج`
-          );
+
+          // Check if current user is an Admin or Merchant/Department Manager
+          const isPrivilegedUser =
+            authStatusRef.current.isAdmin ||
+            authStatusRef.current.isManager ||
+            sessionStorage.getItem('admin_logged_in') === 'true' ||
+            localStorage.getItem('admin_logged_in') === 'true' ||
+            !!sessionStorage.getItem('dept_manager_session') ||
+            !!localStorage.getItem('dept_manager_session');
+
+          // Trigger audio & popup notifications ONLY for Admin and Traders/Managers
+          if (isPrivilegedUser) {
+            setLatestNewOrder(newest);
+            setUnreadOrdersCount((prev) => prev + newlyArrived.length);
+            playOrderNotificationSound();
+            showBrowserNotification(
+              `🔔 طلب جديد #DZ-${newest.id.slice(-6).toUpperCase()}!`,
+              `الزبون: ${newest.customer_name} | المجموع: ${(newest.total_price || (newest as any).total_amount || 0).toLocaleString('ar-DZ')} د.ج`
+            );
+          }
         }
       }
     });
@@ -1237,18 +1262,22 @@ export default function App() {
         }}
       />
 
-      {/* Real-time Order Notification Toast */}
-      <NewOrderNotificationToast
-        order={latestNewOrder}
-        onClose={() => setLatestNewOrder(null)}
-        onOpenAdminOrders={() => {
-          if (!isAdminLoggedIn) {
-            setIsAdminModalOpen(true);
-          } else {
-            navigateToAdmin();
-          }
-        }}
-      />
+      {/* Real-time Order Notification Toast - ONLY visible for Admin and Department Managers */}
+      {(isAdminLoggedIn || departmentManager) && (
+        <NewOrderNotificationToast
+          order={latestNewOrder}
+          onClose={() => setLatestNewOrder(null)}
+          onOpenAdminOrders={() => {
+            if (departmentManager) {
+              setActiveView('department_portal');
+            } else if (isAdminLoggedIn) {
+              navigateToAdmin();
+            } else {
+              setIsAdminModalOpen(true);
+            }
+          }}
+        />
+      )}
 
       {/* Floating Join Us Quick Button */}
       {activeView !== 'admin' && activeView !== 'department_portal' && (
