@@ -152,17 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Direct Login Button if not logged in */}
-          {!isAdmin && !activeManager && (
-            <button
-              onClick={onOpenAdmin}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-800/60 hover:bg-emerald-800 text-emerald-200 hover:text-white text-xs font-bold rounded-xl border border-emerald-600/60 transition-colors"
-              title="دخول الإدارة أو مسؤولي الأقسام"
-            >
-              <LogIn className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="hidden sm:inline">دخول الإدارة</span>
-            </button>
-          )}
+          {/* Direct Login Button hidden for visitors (Accessible via triple-click on logo or Ctrl+Shift+A or /admin) */}
 
           {/* Order Notifications Bell Icon */}
           <div className="relative">
@@ -253,24 +243,26 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 )}
 
-                {/* Admin Quick Link */}
-                <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
-                  <button
-                    onClick={() => {
-                      setIsNotifOpen(false);
-                      if (activeManager) {
-                        if (onOpenPortal) onOpenPortal();
-                      } else {
-                        onOpenAdmin();
-                      }
-                    }}
-                    className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <Shield className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{activeManager ? 'الانتقال إلى لوحة تحكم القسم' : 'الانتقال إلى لوحة التحكم'}</span>
-                    <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-                  </button>
-                </div>
+                {/* Admin Quick Link - only visible for logged in admin or manager */}
+                {(isAdmin || activeManager) && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                    <button
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        if (activeManager) {
+                          if (onOpenPortal) onOpenPortal();
+                        } else {
+                          onOpenAdmin();
+                        }
+                      }}
+                      className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{activeManager ? 'الانتقال إلى لوحة تحكم القسم' : 'الانتقال إلى لوحة التحكم'}</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                    </button>
+                  </div>
+                )}
 
               </div>
             )}
