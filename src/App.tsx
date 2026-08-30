@@ -625,17 +625,17 @@ export default function App() {
           }}
         />
       ) : (
-        <main className="max-w-6xl mx-auto px-4 py-6 space-y-8 pb-20">
+        <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 pb-28 sm:pb-20">
           
           {/* Store Hero Banner */}
-          <div className="relative bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white rounded-2xl p-4 sm:p-5 shadow-md overflow-hidden border border-emerald-600/30">
-            <div className="relative z-10 max-w-lg space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-400/20 text-amber-300 rounded-full text-[11px] font-bold border border-amber-400/30 backdrop-blur-xs">
-                <Sparkles className="w-3 h-3" />
+          <div className="relative bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white rounded-3xl p-4 sm:p-6 shadow-md overflow-hidden border border-emerald-600/30">
+            <div className="relative z-10 max-w-lg space-y-2.5 sm:space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-400/20 text-amber-300 rounded-full text-[10px] sm:text-[11px] font-bold border border-amber-400/30 backdrop-blur-xs">
+                <Sparkles className="w-3 h-3 shrink-0" />
                 <span>التوصيل متوفر لجميع الولايات الجزائرية</span>
               </div>
 
-              <h2 className="text-lg sm:text-xl font-black leading-snug tracking-tight">
+              <h2 className="text-lg sm:text-2xl font-black leading-snug tracking-tight">
                 اشري واطلب مباشرة من دارك بسلاسة وسرعة!
               </h2>
 
@@ -644,26 +644,26 @@ export default function App() {
               </p>
 
               {/* Feature Badges */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[11px] font-bold text-emerald-100">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-2 border-t border-white/10 text-[10px] sm:text-[11px] font-bold text-emerald-100">
                 <div className="flex items-center gap-1">
                   <Truck className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                  <span>توصيل سريع</span>
+                  <span className="truncate">توصيل سريع</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <CreditCard className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                  <span>الدفع عند الاستلام</span>
+                  <span className="truncate">عند الاستلام</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                  <span>منتجات مضمونة</span>
+                  <span className="truncate">مضمونة 100%</span>
                 </div>
               </div>
 
               {/* Prominent Hero Join Us CTA Button */}
-              <div className="pt-2 flex flex-wrap items-center gap-2.5">
+              <div className="pt-2 flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setIsJoinUsOpen(true)}
-                  className="px-4 py-2.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg border border-amber-200 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg border border-amber-200 flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <UserPlus className="w-4 h-4 text-slate-950 stroke-[2.5]" />
                   <span>✨ انضم إلى الموقع كتاجر وافتح قسمك التجاري</span>
@@ -1296,18 +1296,48 @@ export default function App() {
         />
       )}
 
+      {/* Mobile Sticky Bottom Cart Action Bar */}
+      {activeView !== 'admin' && activeView !== 'department_portal' && cartTotalCount > 0 && (
+        <div className="fixed bottom-3 inset-x-3 sm:hidden z-40 bg-emerald-800/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-2xl flex items-center justify-between border border-emerald-600 animate-in slide-in-from-bottom-3 duration-300">
+          <div className="flex items-center gap-2.5">
+            <div className="relative p-2 bg-emerald-700 rounded-xl">
+              <ShoppingBag className="w-5 h-5 text-amber-300" />
+              <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-emerald-800 animate-pulse">
+                {cartTotalCount}
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] text-emerald-200 font-bold">سلة طلباتك ({cartTotalCount})</div>
+              <div className="text-sm font-black text-white">
+                {cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toLocaleString('ar-DZ')} د.ج
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all"
+          >
+            <span>إتمام الطلب</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Floating Join Us Quick Button */}
       {activeView !== 'admin' && activeView !== 'department_portal' && (
         <button
           onClick={() => setIsJoinUsOpen(true)}
-          className="fixed bottom-5 left-4 sm:left-6 z-40 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-3.5 sm:px-4 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl border-2 border-white flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          className={`fixed left-3 sm:left-6 z-30 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full font-black text-[11px] sm:text-sm shadow-xl border-2 border-white flex items-center gap-1.5 sm:gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+            cartTotalCount > 0 ? 'bottom-20 sm:bottom-5' : 'bottom-4 sm:bottom-5'
+          }`}
           title="انضم إلى الموقع وافتح قسمك التجاري"
         >
-          <span className="relative flex h-2.5 w-2.5">
+          <span className="relative flex h-2 sm:h-2.5 w-2 sm:w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-600 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-700"></span>
+            <span className="relative inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-emerald-700"></span>
           </span>
-          <UserPlus className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+          <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950 stroke-[2.5]" />
           <span>انضم إلى الموقع</span>
         </button>
       )}

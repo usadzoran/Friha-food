@@ -63,17 +63,18 @@ export const CartModal: React.FC<CartModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-slate-100"
+        className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh] border border-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 bg-emerald-700 text-white flex items-center justify-between shadow-sm">
+        <div className="p-3.5 sm:p-4 bg-emerald-700 text-white flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-amber-300" />
-            <h2 className="text-lg font-bold">سلة الطلبات ({cartItems.reduce((a, b) => a + b.quantity, 0)})</h2>
+            <h2 className="text-base sm:text-lg font-bold">سلة الطلبات ({cartItems.reduce((a, b) => a + b.quantity, 0)})</h2>
           </div>
           <button
             onClick={onClose}
+            aria-label="إغلاق السلة"
             className="p-1 rounded-lg hover:bg-white/20 text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -81,7 +82,7 @@ export const CartModal: React.FC<CartModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 sm:space-y-5">
           {cartItems.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">

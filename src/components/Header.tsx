@@ -71,40 +71,40 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-emerald-700 text-white shadow-md border-b border-emerald-800">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between relative">
+      <div className="max-w-6xl mx-auto px-2.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between relative gap-2">
         
         {/* Brand / Logo (Triple-click opens login quietly) */}
         <div 
           onClick={handleLogoClick}
-          className="flex items-center gap-2.5 cursor-pointer select-none"
+          className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none min-w-0 shrink"
         >
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-inner">
-            <Store className="w-6 h-6 text-emerald-200" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-inner shrink-0">
+            <Store className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-black tracking-tight text-white leading-tight truncate">
               اشري من دارك
             </h1>
-            <p className="text-xs text-emerald-100/80 font-medium">
+            <p className="text-[10px] sm:text-xs text-emerald-100/80 font-medium truncate hidden min-[360px]:block">
               التسوق السريع والتوصيل للمنزل
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
 
           {/* Department Manager Active Badge & Portal Link */}
           {activeManager && (
-            <div className="flex items-center gap-1 bg-emerald-900/80 border border-emerald-500/50 p-1 pl-2 rounded-xl text-xs">
+            <div className="flex items-center gap-1 bg-emerald-900/80 border border-emerald-500/50 p-0.5 sm:p-1 pl-1.5 sm:pl-2 rounded-xl text-xs">
               <button
                 onClick={onOpenPortal}
-                className="flex items-center gap-1.5 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors shadow-2xs"
+                className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors shadow-2xs text-[11px] sm:text-xs"
                 title="فتح لوحة تحكم القسم"
               >
-                <Folder className="w-3.5 h-3.5 text-emerald-200" />
+                <Folder className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-200" />
                 <span className="hidden sm:inline">قسم:</span>
-                <span className="max-w-[90px] sm:max-w-[120px] truncate">{activeManager.department_name}</span>
+                <span className="max-w-[70px] sm:max-w-[120px] truncate">{activeManager.department_name}</span>
               </button>
 
               <button
@@ -112,21 +112,22 @@ export const Header: React.FC<HeaderProps> = ({
                 className="p-1 text-emerald-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
                 title="تسجيل الخروج من القسم"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
           )}
 
           {/* Super Admin Active Badge */}
           {isAdmin && !activeManager && (
-            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 pl-2 rounded-xl text-xs">
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-0.5 sm:p-1 pl-1.5 sm:pl-2 rounded-xl text-xs">
               <button
                 onClick={onOpenAdmin}
-                className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-lg transition-colors shadow-2xs"
+                className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-lg transition-colors shadow-2xs text-[11px] sm:text-xs"
                 title="لوحة الإدارة الرئيسية"
               >
-                <Shield className="w-3.5 h-3.5 text-amber-400" />
-                <span>المدير العام</span>
+                <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">المدير العام</span>
+                <span className="sm:hidden">الإدارة</span>
               </button>
 
               <button
@@ -134,41 +135,39 @@ export const Header: React.FC<HeaderProps> = ({
                 className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
                 title="الخروج من الإدارة"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
           )}
 
-          {/* Join Us Button - Always visible & prominent */}
+          {/* Join Us Button - Responsive text */}
           {onOpenJoinUs && (
             <button
               onClick={onOpenJoinUs}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-md border border-amber-200 transition-all hover:scale-105 active:scale-95 shrink-0"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-[11px] sm:text-xs font-black rounded-xl shadow-md border border-amber-200 transition-all hover:scale-105 active:scale-95 shrink-0"
               title="انضم إلى الموقع واعرض منتجاتك وافتح قسمك"
             >
               <UserPlus className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
-              <span className="hidden xs:inline">انضم إلى الموقع</span>
-              <span className="xs:hidden">انضم إلينا</span>
+              <span className="hidden md:inline">انضم إلى الموقع</span>
+              <span className="hidden min-[380px]:inline md:hidden">انضم إلينا</span>
             </button>
           )}
 
-          {/* Direct Login Button hidden for visitors (Accessible via triple-click on logo or Ctrl+Shift+A or /admin) */}
-
-          {/* Order Notifications Bell Icon - ONLY visible for Admin and Department Managers / Merchants */}
+          {/* Order Notifications Bell Icon */}
           {(isAdmin || activeManager) && (
             <div className="relative">
               <button
                 onClick={handleToggleNotifMenu}
-                className={`relative p-2 sm:p-2.5 rounded-xl transition-all border ${
+                className={`relative p-1.5 sm:p-2.5 rounded-xl transition-all border ${
                   unreadCount > 0 
                     ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md animate-bounce' 
                     : 'bg-emerald-800/80 hover:bg-emerald-800 text-emerald-100 border-emerald-600'
                 }`}
                 title="إشعارات الطلبات الجديدة"
               >
-                <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-emerald-700 shadow-sm animate-pulse">
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] sm:text-[10px] font-black w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center border-2 border-emerald-700 shadow-sm animate-pulse">
                     {unreadCount}
                   </span>
                 )}
@@ -176,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Notification Menu Dropdown */}
               {isNotifOpen && (
-                <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 z-50 text-xs animate-in fade-in slide-in-from-top-2">
+                <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:left-0 top-14 sm:top-full mt-2 w-auto sm:w-96 max-w-sm bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 z-50 text-xs animate-in fade-in slide-in-from-top-2">
                   
                   {/* Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
@@ -273,13 +272,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Cart Button */}
           <button
             onClick={onOpenCart}
-            className="relative flex items-center gap-1.5 sm:gap-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-900 font-bold px-3 sm:px-3.5 py-2 rounded-xl transition-all shadow-sm"
+            className="relative flex items-center gap-1 sm:gap-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-900 font-bold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all shadow-sm"
             aria-label="سلة الطلبات"
           >
-            <ShoppingBag className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-slate-900" />
-            <span className="text-xs sm:text-sm hidden xs:inline">الطلبات</span>
+            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-slate-900" />
+            <span className="text-xs sm:text-sm hidden min-[480px]:inline">الطلبات</span>
             {cartCount > 0 && (
-              <span className="bg-red-600 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 shadow-sm animate-pulse">
+              <span className="bg-red-600 text-white text-[10px] sm:text-xs font-black w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full flex items-center justify-center border-2 border-amber-500 shadow-sm animate-pulse">
                 {cartCount}
               </span>
             )}

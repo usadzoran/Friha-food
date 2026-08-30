@@ -34,22 +34,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Product Content */}
-      <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between gap-3">
+      <div className="p-2.5 sm:p-4 flex-1 flex flex-col justify-between gap-2 sm:gap-3">
         <div>
-          <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-1 leading-snug group-hover:text-emerald-700 transition-colors">
+          <h3 className="font-bold text-slate-800 text-xs sm:text-base line-clamp-1 leading-snug group-hover:text-emerald-700 transition-colors">
             {product.name}
           </h3>
-          <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+          <p className="text-[11px] sm:text-sm text-slate-500 line-clamp-2 mt-0.5 sm:mt-1 leading-relaxed">
             {product.description || 'منتج عالي الجودة متوفر للطلب المباشر.'}
           </p>
         </div>
 
         {/* Footer info & Add to order button */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 font-medium">السعر</span>
-            <span className="text-emerald-700 font-extrabold text-sm sm:text-base">
-              {product.price.toLocaleString('ar-DZ')} <span className="text-xs font-bold">د.ج</span>
+        <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-slate-100 gap-1">
+          <div className="flex flex-col min-w-0">
+            <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">السعر</span>
+            <span className="text-emerald-700 font-extrabold text-xs sm:text-base truncate">
+              {product.price.toLocaleString('ar-DZ')} <span className="text-[10px] sm:text-xs font-bold">د.ج</span>
             </span>
           </div>
 
@@ -58,7 +58,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               e.stopPropagation();
               onAddToCart(product, e);
             }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95 shadow-2xs ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-sm font-bold transition-all active:scale-95 shadow-2xs shrink-0 ${
               isAdded
                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
@@ -66,13 +66,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           >
             {isAdded ? (
               <>
-                <Check className="w-4 h-4 text-emerald-700" />
-                <span>تمت الإضافة</span>
+                <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" />
+                <span className="hidden min-[380px]:inline">تمت الإضافة</span>
+                <span className="min-[380px]:hidden">تم</span>
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4" />
-                <span>أضف إلى الطلب</span>
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden min-[380px]:inline">أضف للطلب</span>
+                <span className="min-[380px]:hidden">طلب</span>
               </>
             )}
           </button>
