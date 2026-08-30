@@ -607,6 +607,11 @@ export default function App() {
           onLogout={handleManagerLogout}
           onGoHome={navigateToHome}
           onGoToStore={navigateToHome}
+          onUpdateManager={(updatedMgr) => {
+            setDepartmentManager(updatedMgr);
+            sessionStorage.setItem('dept_manager_session', JSON.stringify(updatedMgr));
+            localStorage.setItem('dept_manager_session', JSON.stringify(updatedMgr));
+          }}
         />
       ) : isAdminLoggedIn && activeView === 'admin' ? (
         <AdminDashboard

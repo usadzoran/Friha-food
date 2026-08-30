@@ -572,10 +572,10 @@ export async function authenticateDepartmentManagerSupabase(
 
   if (!cleanUser || !cleanPass) return null;
 
+  // Query all managers without restrictive boolean SQL filters to avoid type mismatch
   const { data, error } = await supabase
     .from('department_managers')
-    .select('*')
-    .eq('is_active', true);
+    .select('*');
 
   if (error) {
     console.error('Supabase error during authentication query:', error);
@@ -586,21 +586,59 @@ export async function authenticateDepartmentManagerSupabase(
   const cleanUserPhone = cleanUser.replace(/[^0-9]/g, '');
 
   const found = managers.find((m) => {
-    const managerPhoneDigits = m.phone.replace(/[^0-9]/g, '');
-    const matchUser =
-      m.username.toLowerCase() === cleanUser ||
-      (cleanUserPhone.length >= 8 && managerPhoneDigits.endsWith(cleanUserPhone.slice(-8)));
-    const matchPass = m.password_plain === cleanPass;
-    return matchUser && matchPass;
+    const mUser = (m.username || '').trim().toLowerCase();
+    const mPhone = (m.phone || '').trim();
+    const mId = (m.id || '').trim().toLowerCase();
+    const mName = (m.manager_name || '').trim().toLowerCase();
+
+    // 1. Check username, ID, or manager full name match
+    const matchUsername =
+      mUser === cleanUser ||
+      mId === cleanUser ||
+      mName === cleanUser ||
+      cleanUser === `@${mUser}` ||
+      mUser === cleanUser.replace(/^@/, '');
+
+    // 2. Check phone match (supports Algerian formats 05xx, 06xx, 07xx, 213xx, +213xx)
+    const managerPhoneDigits = mPhone.replace(/[^0-9]/g, '');
+    let matchPhone = false;
+    if (cleanUserPhone.length >= 7 && managerPhoneDigits.length >= 7) {
+      matchPhone =
+        managerPhoneDigits === cleanUserPhone ||
+        managerPhoneDigits.endsWith(cleanUserPhone.slice(-8)) ||
+        cleanUserPhone.endsWith(managerPhoneDigits.slice(-8)) ||
+        managerPhoneDigits.endsWith(cleanUserPhone.slice(-9)) ||
+        cleanUserPhone.endsWith(managerPhoneDigits.slice(-9));
+    }
+
+    if (!matchUsername && !matchPhone) return false;
+
+    // 3. Password matching (case-sensitive check and case-insensitive fallback)
+    const passPlain = (m.password_plain || '').trim();
+    const passHash = ((m as any).password_hash || '').trim();
+    const matchPass =
+      passPlain === cleanPass ||
+      passHash === cleanPass ||
+      passPlain.toLowerCase() === cleanPass.toLowerCase();
+
+    return matchPass;
   });
 
   if (found) {
+    // Check if account was explicitly deactivated
+    if (found.is_active === false) {
+      throw new Error('تم تعطيل هذا الحساب من قِبل إدارة المتجر. يرجى التواصل مع المدير العام لتفعيله.');
+    }
+
     const updated = { ...found, last_login_at: new Date().toISOString() };
-    supabase
-      .from('department_managers')
-      .update({ last_login_at: updated.last_login_at })
-      .eq('id', found.id)
-      .then(() => {});
+    try {
+      await supabase
+        .from('department_managers')
+        .update({ last_login_at: updated.last_login_at })
+        .eq('id', found.id);
+    } catch (err) {
+      console.warn('Non-fatal: could not update last_login_at', err);
+    }
     return updated;
   }
 

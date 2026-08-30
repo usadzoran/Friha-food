@@ -4,7 +4,10 @@ import {
   saveProduct, 
   deleteProduct, 
   updateOrderStatus, 
-  saveCategoryWhatsappNumber 
+  saveCategoryWhatsappNumber,
+  addCategory,
+  updateCategory,
+  saveDepartmentManager
 } from '../../services/storeService';
 import { normalizeAlgerianWhatsAppNumber } from '../../utils/whatsappOrder';
 import { 
@@ -35,7 +38,9 @@ import {
   EyeOff, 
   Save, 
   RefreshCw,
-  Send
+  Send,
+  Image as ImageIcon,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 interface DepartmentManagerPortalProps {
@@ -47,7 +52,17 @@ interface DepartmentManagerPortalProps {
   onLogout: () => void;
   onGoToStore?: () => void;
   onGoHome?: () => void;
+  onUpdateManager?: (manager: DepartmentManager) => void;
 }
+
+const PRESET_COVERS = [
+  { name: 'تمور وفواكه وأطعمة', url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80' },
+  { name: 'ألبسة وأزياء وأحذية', url: 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=600&q=80' },
+  { name: 'عطور ومستحضرات تجميل', url: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=600&q=80' },
+  { name: 'إلكترونيات وهواتف', url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80' },
+  { name: 'أواني وأجهزة منزلية', url: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80' },
+  { name: 'منتجات طبيعية وعسل', url: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80' },
+];
 
 export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = ({
   manager,
@@ -57,11 +72,12 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
   orders = [],
   onLogout,
   onGoToStore,
-  onGoHome
+  onGoHome,
+  onUpdateManager
 }) => {
   // Derive category if not directly passed
   const category: Category = propCategory || 
-    categories.find(c => c.id === manager.category_id || c.name === manager.category_name) || {
+    categories.find(c => c.id === manager.category_id || (c.name && c.name.trim().toLowerCase() === (manager.category_name || '').trim().toLowerCase())) || {
       id: manager.category_id || 'general',
       name: manager.category_name || 'القسم التجاري',
       icon: 'Store',
@@ -69,12 +85,27 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
       whatsapp_number: manager.phone || ''
     };
 
+  const isCategoryCreatedInStore = categories.some(
+    c => c.id === category.id || (c.name && c.name.trim().toLowerCase() === category.name.trim().toLowerCase())
+  );
+
   const handleGoToStore = onGoHome || onGoToStore || (() => {});
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'settings'>('products');
   const [productSearch, setProductSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | OrderStatus>('all');
   
+  // Department Edit / Setup Modal State
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [isSavingDept, setIsSavingDept] = useState(false);
+  const [deptForm, setDeptForm] = useState({
+    name: category.name || manager.category_name || '',
+    image_url: category.image_url || '',
+    whatsapp_number: category.whatsapp_number || manager.phone || '',
+    icon: category.icon || 'Store'
+  });
+  const [deptImagePreview, setDeptImagePreview] = useState<string>(category.image_url || '');
+
   // Product Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -143,6 +174,93 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
       activeProductsCount: deptProducts.filter(p => p.active).length
     };
   }, [deptOrders, deptProducts, products, category]);
+
+  // Handle Department Setup & Editing
+  const handleOpenDeptModal = () => {
+    setDeptForm({
+      name: category.name || manager.category_name || '',
+      image_url: category.image_url || '',
+      whatsapp_number: category.whatsapp_number || manager.phone || '',
+      icon: category.icon || 'Store'
+    });
+    setDeptImagePreview(category.image_url || '');
+    setIsDeptModalOpen(true);
+  };
+
+  const handleDeptImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setDeptImagePreview(result);
+      setDeptForm(prev => ({ ...prev, image_url: result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveDepartmentForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deptForm.name.trim()) {
+      alert('يرجى كتابة اسم القسم التجاري.');
+      return;
+    }
+
+    setIsSavingDept(true);
+    try {
+      const cleanName = deptForm.name.trim();
+      const cleanPhone = deptForm.whatsapp_number.trim();
+      let targetCategoryId = category.id;
+
+      const existingCat = categories.find(c => c.id === category.id && c.id !== 'general');
+
+      if (existingCat) {
+        // Update existing category in Supabase
+        await updateCategory(existingCat.id, {
+          name: cleanName,
+          image_url: deptForm.image_url,
+          whatsapp_number: cleanPhone,
+          icon: deptForm.icon || 'Store'
+        });
+        targetCategoryId = existingCat.id;
+      } else {
+        // Create new category in Supabase
+        const newCatId = await addCategory({
+          name: cleanName,
+          image_url: deptForm.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+          whatsapp_number: cleanPhone,
+          icon: deptForm.icon || 'Store'
+        });
+        if (newCatId) {
+          targetCategoryId = newCatId;
+        }
+      }
+
+      // Update manager details with the newly assigned/confirmed category ID and Name
+      const updatedManager = await saveDepartmentManager({
+        ...manager,
+        category_id: targetCategoryId,
+        category_name: cleanName,
+        phone: cleanPhone || manager.phone
+      });
+
+      // Update local state and notify App.tsx
+      setDeptWhatsApp(cleanPhone);
+      if (onUpdateManager) {
+        onUpdateManager(updatedManager);
+      }
+
+      setIsDeptModalOpen(false);
+      setSaveNotice('تم حفظ وتجهيز بيانات القسم التجاري بنجاح! يظهر قسمك الآن لجميع زوار المتجر.');
+      setTimeout(() => setSaveNotice(null), 4000);
+    } catch (err: any) {
+      console.error('Error saving department:', err);
+      alert('حدث خطأ أثناء حفظ بيانات القسم: ' + (err?.message || 'تأكد من الاتصال'));
+    } finally {
+      setIsSavingDept(false);
+    }
+  };
 
   // Handle Product Save
   const handleOpenAddProduct = () => {
@@ -326,6 +444,15 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
           {/* Top Actions */}
           <div className="flex items-center gap-2">
             <button
+              onClick={handleOpenDeptModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors shadow-xs"
+              title="إعداد أو تعديل بيانات القسم"
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>إعداد بيانات القسم</span>
+            </button>
+
+            <button
               onClick={handleGoToStore}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-colors border border-slate-700"
               title="معاينة المتجر"
@@ -387,7 +514,7 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
               }`}
             >
               <MessageCircle className="w-4 h-4 text-emerald-400" />
-              <span>رقم واتساب القسم والإعدادات</span>
+              <span>تخصيص القسم ورقم الواتساب</span>
             </button>
           </div>
         </div>
@@ -405,6 +532,31 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
             </div>
             <button onClick={() => setSaveNotice(null)} className="text-white/80 hover:text-white">
               <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* New Department Manager Onboarding Banner */}
+        {(!isCategoryCreatedInStore || category.id === 'general') && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-600 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-amber-300/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-center sm:text-right">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black/20 text-amber-100 rounded-full text-xs font-bold mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>خطوة مهمة للبدء</span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black leading-snug">
+                🎉 مرحباً بك كمسؤول قسم جديد! قم بإنشاء وتجهيز قسمك الآن
+              </h2>
+              <p className="text-xs sm:text-sm text-amber-100/90 font-medium max-w-xl">
+                حدد اسم قسمك التجاري (مثال: قسم التمور، قسم الملابس...)، واختر صورة الواجهة ورقم WhatsApp لاستقبال طلبات الزبائن مباشرة على هاتفك.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenDeptModal}
+              className="px-5 py-3 bg-slate-950 hover:bg-slate-900 text-amber-400 font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 shrink-0 border border-amber-400/30"
+            >
+              <Folder className="w-4 h-4 text-emerald-400" />
+              <span>🚀 إنشاء وتجهيز قسمي التجاري الآن</span>
             </button>
           </div>
         )}
@@ -767,85 +919,301 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
           </div>
         )}
 
-        {/* TAB 3: SETTINGS & WHATSAPP CONFIGURATION */}
+        {/* TAB 3: SETTINGS & DEPARTMENT CUSTOMIZATION */}
         {activeTab === 'settings' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6 shadow-xs max-w-2xl mx-auto">
-            <div className="border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs mb-1">
-                <MessageCircle className="w-4 h-4" />
-                <span>إعدادات التواصل واستقبال الطلبات</span>
+          <div className="space-y-6 max-w-3xl mx-auto">
+            
+            {/* Department Profile & Visual Identity Card */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-6 shadow-xs">
+              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs mb-1">
+                    <Folder className="w-4 h-4" />
+                    <span>تخصيص وبيانات القسم التجاري</span>
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900">
+                    معلومات واجهة قسمك على المتجر
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    يمكنك تعديل اسم القسم، وتعيين صورة الغلاف لتظهر بشكل مميز وجذاب للزوار.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleOpenDeptModal}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>تعديل بيانات القسم</span>
+                </button>
               </div>
-              <h3 className="text-lg font-black text-slate-900">
-                رقم WhatsApp المخصص لاستقبال طلبات قسم: {category.name}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                عند قيام أي زبون بطلب منتجات من قسمك، يتم توجيه رسالة الطلب مباشرة إلى هذا الرقم على WhatsApp دون الحاجة لتدخل الإدارة.
-              </p>
+
+              {/* Department Preview Card */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-200 shrink-0 border border-slate-300 shadow-inner">
+                  <img
+                    src={category.image_url || deptForm.image_url || 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80'}
+                    alt={category.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="space-y-2 grow text-center sm:text-right">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <h4 className="text-base sm:text-lg font-black text-slate-900">{category.name}</h4>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                      {isCategoryCreatedInStore ? 'مفعّل في المتجر' : 'قيد الإعداد'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 flex items-center justify-center sm:justify-start gap-2">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>رقم الواتساب للطلبات: <strong className="font-mono text-slate-900">{category.whatsapp_number || manager.phone}</strong></span>
+                  </p>
+
+                  <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+                    <button
+                      onClick={handleOpenDeptModal}
+                      className="text-xs text-emerald-700 hover:text-emerald-800 font-bold underline"
+                    >
+                      تغيير صورة الغلاف أو الاسم...
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveDeptWhatsApp} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  رقم WhatsApp لقسمك:
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    required
-                    value={deptWhatsApp}
-                    onChange={(e) => setDeptWhatsApp(e.target.value)}
-                    placeholder="مثال: 0555123456 أو 0661234567"
-                    className="w-full pl-3 pr-9 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-mono bg-slate-50"
-                  />
-                  <Phone className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+            {/* WhatsApp Setting Card */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-6 shadow-xs">
+              <div className="border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs mb-1">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>إعدادات التواصل واستقبال الطلبات</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  الرقم بعد التهيئة: <span className="font-mono text-emerald-700 font-bold">{normalizeAlgerianWhatsAppNumber(deptWhatsApp)}</span>
+                <h3 className="text-lg font-black text-slate-900">
+                  رقم WhatsApp المخصص لاستقبال طلبات قسم: {category.name}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  عند قيام أي زبون بطلب منتجات من قسمك، يتم توجيه رسالة الطلب مباشرة إلى هذا الرقم على WhatsApp دون الحاجة لتدخل الإدارة.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSavingWhatsApp}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSavingWhatsApp ? 'جاري الحفظ...' : 'حفظ وتحديث رقم الواتساب'}</span>
-                </button>
+              <form onSubmit={handleSaveDeptWhatsApp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    رقم WhatsApp لقسمك:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      required
+                      value={deptWhatsApp}
+                      onChange={(e) => setDeptWhatsApp(e.target.value)}
+                      placeholder="مثال: 0555123456 أو 0661234567"
+                      className="w-full pl-3 pr-9 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-mono bg-slate-50"
+                    />
+                    <Phone className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    الرقم بعد التهيئة: <span className="font-mono text-emerald-700 font-bold">{normalizeAlgerianWhatsAppNumber(deptWhatsApp)}</span>
+                  </p>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const clean = normalizeAlgerianWhatsAppNumber(deptWhatsApp);
-                    const testUrl = `https://wa.me/${clean}?text=${encodeURIComponent(`👋 مرحباً، هذه رسالة تجربة لتأكيد عمل رقم WhatsApp لقسم (${category.name}).`)}`;
-                    window.open(testUrl, '_blank');
-                  }}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-1.5"
-                >
-                  <Send className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>تجربة إرسال رسالة للرقم</span>
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingWhatsApp}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSavingWhatsApp ? 'جاري الحفظ...' : 'حفظ وتحديث رقم الواتساب'}</span>
+                  </button>
 
-            {/* Account Credentials Card */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
-              <span className="font-bold text-slate-700 block">معلومات حسابك:</span>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>اسم المستخدم:</span>
-                <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{manager.username}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = normalizeAlgerianWhatsAppNumber(deptWhatsApp);
+                      const testUrl = `https://wa.me/${clean}?text=${encodeURIComponent(`👋 مرحباً، هذه رسالة تجربة لتأكيد عمل رقم WhatsApp لقسم (${category.name}).`)}`;
+                      window.open(testUrl, '_blank');
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>تجربة إرسال رسالة للرقم</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Account Credentials Card */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <span className="font-bold text-slate-700 block">معلومات حساب المسؤول:</span>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>اسم المستخدم:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{manager.username}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>القسم المسند:</span>
+                  <span className="font-bold text-emerald-700">{category.name}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>القسم المسند:</span>
-                <span className="font-bold text-emerald-700">{category.name}</span>
-              </div>
+
             </div>
 
           </div>
         )}
 
       </main>
+
+      {/* Department Setup & Creation Modal */}
+      {isDeptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div 
+            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Folder className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-black text-sm sm:text-base">
+                  {isCategoryCreatedInStore ? 'تعديل وتخصيص بيانات القسم' : 'إنشاء وتجهيز قسم تجاري جديد'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsDeptModalOpen(false)}
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveDepartmentForm} className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              
+              {/* Department Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  اسم القسم التجاري: <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: قسم التمور والفواكه المجففة أو قسم الأزياء الرجالية"
+                  value={deptForm.name}
+                  onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white font-bold"
+                />
+              </div>
+
+              {/* WhatsApp Number */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  رقم WhatsApp لاستقبال طلبات الزبائن: <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="مثال: 0555123456 أو 0661234567"
+                  value={deptForm.whatsapp_number}
+                  onChange={(e) => setDeptForm({ ...deptForm, whatsapp_number: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white font-mono"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  الرقم المهيأ: <span className="font-mono text-emerald-700 font-bold">{normalizeAlgerianWhatsAppNumber(deptForm.whatsapp_number)}</span>
+                </p>
+              </div>
+
+              {/* Cover Image Upload / Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  صورة غلاف / واجهة القسم:
+                </label>
+
+                <div className="flex items-center gap-3">
+                  {deptImagePreview ? (
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 shadow-inner">
+                      <img src={deptImagePreview} alt="Dept Preview" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 shrink-0 bg-slate-50">
+                      <ImageIcon className="w-8 h-8" />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5 grow">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-200">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>رفع صورة من جهازك</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleDeptImageFileChange} 
+                        className="hidden" 
+                      />
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="أو ضع رابط صورة مباشر..."
+                      value={deptForm.image_url.startsWith('data:') ? '' : deptForm.image_url}
+                      onChange={(e) => {
+                        setDeptForm({ ...deptForm, image_url: e.target.value });
+                        setDeptImagePreview(e.target.value);
+                      }}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Preset Suggestions */}
+                <div className="pt-2">
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1.5">أو اختر صورة جاهزة عالية الجودة:</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {PRESET_COVERS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setDeptForm({ ...deptForm, image_url: preset.url });
+                          setDeptImagePreview(preset.url);
+                        }}
+                        className={`p-1.5 rounded-xl border text-[10px] font-bold text-right transition-all flex items-center gap-1.5 ${
+                          deptImagePreview === preset.url
+                            ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-black ring-1 ring-emerald-500'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <img src={preset.url} alt="" className="w-6 h-6 rounded-lg object-cover shrink-0" />
+                        <span className="truncate">{preset.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeptModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDept}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingDept ? 'جاري الحفظ...' : isCategoryCreatedInStore ? 'حفظ تعديلات القسم' : 'إنشاء القسم وتفعيله'}</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Product Add/Edit Modal */}
       {isProductModalOpen && (

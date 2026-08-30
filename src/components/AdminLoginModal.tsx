@@ -64,7 +64,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const manager = await authenticateDepartmentManager(managerUsername, managerPassword);
+      const manager = await authenticateDepartmentManager(managerUsername.trim(), managerPassword.trim());
       if (manager) {
         onManagerLoginSuccess(manager);
         setManagerUsername('');
@@ -72,10 +72,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         setError('');
         onClose();
       } else {
-        setError('بيانات الدخول غير صحيحة. تأكد من اسم المستخدم أو رقم الهاتف وكلمة المرور المسجلة في الدعوة.');
+        setError('بيانات الدخول غير مطابقة. تأكد من إدخال اسم المستخدم أو رقم الهاتف المسجل وكلمة المرور بشكل صحيح.');
       }
     } catch (err: any) {
-      setError('حدث خطأ أثناء التحقق: ' + err?.message);
+      setError(err?.message || 'حدث خطأ أثناء التحقق من بيانات الدخول');
     } finally {
       setIsSubmitting(false);
     }
