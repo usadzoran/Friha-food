@@ -19,15 +19,34 @@ import {
   ExternalLink,
   MessageSquare,
   AlertCircle,
-  Clock
+  Clock,
+  Sparkles,
+  Upload,
+  Image as ImageIcon,
+  Layers,
+  Store,
+  ShoppingBag,
+  Shirt,
+  Utensils,
+  Smartphone
 } from 'lucide-react';
 import { DepartmentManager, Category } from '../../types';
 import { 
   saveDepartmentManager, 
   deleteDepartmentManager, 
-  toggleDepartmentManagerActive 
+  toggleDepartmentManagerActive,
+  addCategory
 } from '../../services/storeService';
 import { normalizeAlgerianWhatsAppNumber } from '../../utils/whatsappOrder';
+
+const PRESET_COVERS = [
+  { name: 'تمور وفواكه وأطعمة', url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80' },
+  { name: 'ألبسة وأزياء وأحذية', url: 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=600&q=80' },
+  { name: 'عطور ومستحضرات تجمil', url: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=600&q=80' },
+  { name: 'إلكترونيات وهواتف', url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80' },
+  { name: 'أواني وأجهزة منزلية', url: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80' },
+  { name: 'منتجات طبيعية وعسل', url: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80' },
+];
 
 interface DepartmentManagersTabProps {
   managers: DepartmentManager[];
@@ -55,6 +74,13 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
   const [categoryId, setCategoryId] = useState('');
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
+
+  // New Department Creation State
+  const [deptAssignmentMode, setDeptAssignmentMode] = useState<'existing' | 'create_new' | 'delegate'>('create_new');
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptImage, setNewDeptImage] = useState('');
+  const [newDeptIcon, setNewDeptIcon] = useState('Store');
+  const [newDeptPhone, setNewDeptPhone] = useState('');
   
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -66,10 +92,15 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
     setManagerName('');
     setPhone('');
     setUsername('');
-    setPasswordPlain('');
+    setPasswordPlain(`dz${Math.floor(100000 + Math.random() * 900000)}`);
     setCategoryId(categories.length > 0 ? categories[0].id : '');
     setNotes('');
     setIsActive(true);
+    setDeptAssignmentMode('create_new');
+    setNewDeptName('');
+    setNewDeptImage(PRESET_COVERS[0].url);
+    setNewDeptIcon('Store');
+    setNewDeptPhone('');
     setErrorMsg('');
     setIsModalOpen(true);
   };
@@ -84,8 +115,20 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
     setCategoryId(mgr.category_id);
     setNotes(mgr.notes || '');
     setIsActive(mgr.is_active);
+    setDeptAssignmentMode('existing');
     setErrorMsg('');
     setIsModalOpen(true);
+  };
+
+  // Handle department cover image upload
+  const handleDeptImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewDeptImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Save / Update manager
@@ -107,24 +150,50 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
       setErrorMsg('يرجى كتابة كلمة المرور.');
       return;
     }
-    if (!categoryId) {
-      setErrorMsg('يرجى اختيار القسم التابع له.');
-      return;
-    }
 
     setIsSaving(true);
     setErrorMsg('');
 
     try {
-      const selectedCat = categories.find(c => c.id === categoryId);
+      let finalCategoryId = categoryId;
+      let finalCategoryName = '';
+
+      if (!editingManager && deptAssignmentMode === 'create_new') {
+        if (!newDeptName.trim()) {
+          setErrorMsg('يرجى كتابة اسم القسم التجاري الجديد.');
+          setIsSaving(false);
+          return;
+        }
+
+        // Create new category in Supabase
+        const cleanDeptName = newDeptName.trim();
+        const cleanDeptPhone = newDeptPhone.trim() || phone.trim();
+        const createdCatId = await addCategory({
+          name: cleanDeptName,
+          image_url: newDeptImage.trim() || PRESET_COVERS[0].url,
+          whatsapp_number: cleanDeptPhone,
+          icon: newDeptIcon || 'Store'
+        });
+
+        finalCategoryId = createdCatId || 'general';
+        finalCategoryName = cleanDeptName;
+      } else if (!editingManager && deptAssignmentMode === 'delegate') {
+        finalCategoryId = 'general';
+        finalCategoryName = 'القسم التجاري (قيد التجهيز من قبل المسؤول)';
+      } else {
+        const selectedCat = categories.find(c => c.id === categoryId);
+        finalCategoryId = categoryId;
+        finalCategoryName = selectedCat ? selectedCat.name : 'عام';
+      }
+
       await saveDepartmentManager({
         id: editingManager ? editingManager.id : undefined,
         manager_name: managerName.trim(),
         phone: phone.trim(),
         username: username.trim().toLowerCase(),
         password_plain: passwordPlain.trim(),
-        category_id: categoryId,
-        category_name: selectedCat ? selectedCat.name : '',
+        category_id: finalCategoryId,
+        category_name: finalCategoryName,
         notes: notes.trim(),
         is_active: isActive,
         created_at: editingManager ? editingManager.created_at : undefined,
@@ -439,24 +508,222 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
                 />
               </div>
 
-              {/* Category Assignment */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  القسم المخصص له <span className="text-rose-500">*</span>
+              {/* Category Assignment Options */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  القسم التجاري المخصص لهذا المسؤول: <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  required
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                >
-                  <option value="" disabled>اختر القسم التجاري</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+
+                {!editingManager && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setDeptAssignmentMode('create_new')}
+                      className={`p-2.5 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                        deptAssignmentMode === 'create_new'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>إنشاء قسم جديد</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">تخصيص قسم كامل جديد بالاسم والصورة</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeptAssignmentMode('existing')}
+                      className={`p-2.5 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                        deptAssignmentMode === 'existing'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>قسم موجود مسبقاً</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">اختيار من قائمة الأقسام الحالية</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeptAssignmentMode('delegate')}
+                      className={`p-2.5 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                        deptAssignmentMode === 'delegate'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <User className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>تفويض للمسؤول</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">ينشئه المسؤول بنفسه عند دخوله</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Sub-view based on mode */}
+                {deptAssignmentMode === 'existing' || editingManager ? (
+                  <select
+                    required
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
+                  >
+                    <option value="" disabled>اختر القسم التجاري</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : deptAssignmentMode === 'create_new' ? (
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-emerald-200/80 space-y-3">
+                    <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>بيانات وتجهيز القسم الجديد:</span>
+                    </div>
+
+                    {/* New Dept Name */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        اسم القسم التجاري الجديد <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required={deptAssignmentMode === 'create_new'}
+                        placeholder="مثال: قسم التمور والفواكه المجففة أو قسم الأزياء"
+                        value={newDeptName}
+                        onChange={(e) => setNewDeptName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 font-bold"
+                      />
+                    </div>
+
+                    {/* Dept Icon Selector */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        نوع وأيقونة القسم:
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5 text-xs">
+                        {[
+                          { id: 'Store', label: 'متجر عام', icon: Store },
+                          { id: 'ShoppingBag', label: 'حقائب وتسوق', icon: ShoppingBag },
+                          { id: 'Shirt', label: 'ملابس وأزياء', icon: Shirt },
+                          { id: 'Utensils', label: 'أطعمة وأواني', icon: Utensils },
+                          { id: 'Smartphone', label: 'هواتف وإلكترونيات', icon: Smartphone },
+                          { id: 'Sparkles', label: 'منتجات مميزة', icon: Sparkles },
+                        ].map((ic) => {
+                          const IconComp = ic.icon;
+                          return (
+                            <button
+                              key={ic.id}
+                              type="button"
+                              onClick={() => setNewDeptIcon(ic.id)}
+                              className={`p-1.5 rounded-lg border flex items-center justify-center gap-1.5 transition-all text-[11px] ${
+                                newDeptIcon === ic.id
+                                  ? 'bg-emerald-600 text-white border-emerald-600 font-bold'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <IconComp className="w-3.5 h-3.5" />
+                              <span className="truncate">{ic.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Cover Image Upload & Presets */}
+                    <div className="space-y-2">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        صورة غلاف / واجهة القسم:
+                      </label>
+
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-200 shadow-inner">
+                          <img
+                            src={newDeptImage || PRESET_COVERS[0].url}
+                            alt="Cover"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        <div className="space-y-1 grow">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-300">
+                            <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>رفع صورة من الجهاز</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleDeptImageUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="أو ضع رابط صورة مباشر..."
+                            value={newDeptImage.startsWith('data:') ? '' : newDeptImage}
+                            onChange={(e) => setNewDeptImage(e.target.value)}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ready Presets */}
+                      <div className="pt-1">
+                        <span className="text-[10px] font-bold text-slate-500 block mb-1">أو اختر صورة جاهزة عالية الجودة:</span>
+                        <div className="grid grid-cols-3 gap-1">
+                          {PRESET_COVERS.map((preset, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setNewDeptImage(preset.url)}
+                              className={`p-1 rounded-lg border text-[10px] font-bold text-right transition-all flex items-center gap-1 ${
+                                newDeptImage === preset.url
+                                  ? 'border-emerald-600 bg-emerald-100 text-emerald-950'
+                                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <img src={preset.url} alt="" className="w-5 h-5 rounded object-cover shrink-0" />
+                              <span className="truncate">{preset.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* WhatsApp for new dept */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        رقم WhatsApp لطلبيات القسم:
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="اتركه فارغاً ليستخدم رقم هاتف المسؤول تلقائياً"
+                        value={newDeptPhone}
+                        onChange={(e) => setNewDeptPhone(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1 text-amber-800">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>تفويض حر للمسؤول</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                      فور قيام المسؤول بتسجيل الدخول بحسابه، ستظهر له نافذة الترحيب والتجهيز ليختار بنفسه اسم وصورة ورقم واتساب قسمه التجاري بشكل كامل.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Phone & WhatsApp */}

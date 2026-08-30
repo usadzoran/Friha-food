@@ -21,13 +21,16 @@ import {
   MessageSquare,
   ShieldCheck,
   AlertCircle,
-  Eye
+  Eye,
+  Sparkles,
+  Store
 } from 'lucide-react';
 import { JoinRequest, Category, DepartmentManager } from '../../types';
 import { 
   updateJoinRequest, 
   deleteJoinRequest, 
-  approveAndInviteJoinRequest 
+  approveAndInviteJoinRequest,
+  addCategory
 } from '../../services/storeService';
 
 interface JoinRequestsTabProps {
@@ -49,6 +52,8 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
   
   // Invitation Form Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isNewCategoryMode, setIsNewCategoryMode] = useState(false);
+  const [customNewCategoryName, setCustomNewCategoryName] = useState('');
   const [assignedCategoryId, setAssignedCategoryId] = useState('');
   const [assignedUsername, setAssignedUsername] = useState('');
   const [assignedPassword, setAssignedPassword] = useState('');
@@ -99,11 +104,17 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
     setAssignedUsername(suggestedUsername);
     setAssignedPassword(suggestedPassword);
     
+    // Suggested custom category name from applicant's work type
+    const rawWork = req.work_type.replace(/\[.*\]/, '').trim();
+    setCustomNewCategoryName(rawWork || `قسم ${req.first_name}`);
+    setIsNewCategoryMode(false);
+
     // Try to auto-select matching category if present
     if (categories.length > 0) {
       setAssignedCategoryId(categories[0].id);
     } else {
       setAssignedCategoryId('');
+      setIsNewCategoryMode(true);
     }
 
     setInviteNotes('');
@@ -114,8 +125,13 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
     if (!selectedRequest) return;
     setErrorMsg('');
 
-    if (!assignedCategoryId) {
+    if (!isNewCategoryMode && !assignedCategoryId) {
       setErrorMsg('يرجى تحديد القسم المخصص لهذا المسؤول');
+      return;
+    }
+
+    if (isNewCategoryMode && !customNewCategoryName.trim()) {
+      setErrorMsg('يرجى إدخال اسم القسم الجديد');
       return;
     }
 
@@ -129,16 +145,31 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
       return;
     }
 
-    const targetCategory = categories.find((c) => c.id === assignedCategoryId);
-    const categoryName = targetCategory ? targetCategory.name : 'عام';
-
     setIsProcessing(true);
 
     try {
+      let targetCategoryId = assignedCategoryId;
+      let targetCategoryName = '';
+
+      if (isNewCategoryMode) {
+        const cleanCatName = customNewCategoryName.trim();
+        const createdCatId = await addCategory({
+          name: cleanCatName,
+          image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+          whatsapp_number: selectedRequest.phone.trim(),
+          icon: 'Store'
+        });
+        targetCategoryId = createdCatId || 'general';
+        targetCategoryName = cleanCatName;
+      } else {
+        const targetCategory = categories.find((c) => c.id === assignedCategoryId);
+        targetCategoryName = targetCategory ? targetCategory.name : 'عام';
+      }
+
       const result = await approveAndInviteJoinRequest({
         requestId: selectedRequest.id,
-        categoryId: assignedCategoryId,
-        categoryName: categoryName,
+        categoryId: targetCategoryId,
+        categoryName: targetCategoryName,
         username: assignedUsername.trim().toLowerCase(),
         passwordPlain: assignedPassword.trim(),
         notes: inviteNotes.trim()
@@ -151,7 +182,7 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
         username: assignedUsername.trim().toLowerCase(),
         passwordPlain: assignedPassword.trim(),
         managerName: `${selectedRequest.first_name} ${selectedRequest.last_name}`,
-        categoryName: categoryName
+        categoryName: targetCategoryName
       });
 
       if (onRefresh) onRefresh();
@@ -521,25 +552,55 @@ export const JoinRequestsTab: React.FC<JoinRequestsTabProps> = ({
               )}
 
               {/* Department assignment */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-emerald-600" />
-                  <span>القسم المخصص لهذا المسؤول <span className="text-red-500">*</span></span>
-                </label>
-                <select
-                  value={assignedCategoryId}
-                  onChange={(e) => setAssignedCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
-                >
-                  <option value="">-- اختر القسم --</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  سيتمكن هذا المسؤول من إدارة منتجات وطلبيات هذا القسم فقط بعد تسجيل دخوله.
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    <span>القسم المخصص لهذا المسؤول <span className="text-red-500">*</span></span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewCategoryMode(!isNewCategoryMode)}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{isNewCategoryMode ? 'اختيار من الأقسام الحالية' : '✨ إنشاء قسم جديد بالكامل للمتقدم'}</span>
+                  </button>
+                </div>
+
+                {isNewCategoryMode ? (
+                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2">
+                    <label className="block text-xs font-bold text-emerald-950">
+                      اسم القسم الجديد المراد إنشاؤه له:
+                    </label>
+                    <input
+                      type="text"
+                      value={customNewCategoryName}
+                      onChange={(e) => setCustomNewCategoryName(e.target.value)}
+                      placeholder="مثال: قسم التمور، قسم الأواني، إلخ..."
+                      className="w-full px-3.5 py-2 bg-white border border-emerald-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-[11px] text-emerald-800 block">
+                      💡 سيتم إنشاء وتجهيز هذا القسم التجاري تلقائياً وربطه مباشرة بهذا المسؤول.
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    value={assignedCategoryId}
+                    onChange={(e) => setAssignedCategoryId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                  >
+                    <option value="">-- اختر القسم --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                <p className="text-[11px] text-slate-400">
+                  سيتمكن هذا المسؤول من إدارة وتعديل كامل تفاصيل هذا القسم ومنتجاته وطلبياته عبر لوحة تحكمه.
                 </p>
               </div>
 
