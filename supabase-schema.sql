@@ -3,18 +3,21 @@
 -- Safe Migration: Non-destructive, idempotent (no DROP/TRUNCATE)
 -- ====================================================================
 
--- 1. CATEGORIES TABLE
+-- 1. CATEGORIES TABLE (الأقسام والمتاجر)
 CREATE TABLE IF NOT EXISTS public.categories (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    icon TEXT,
-    image_url TEXT,
+    icon TEXT DEFAULT 'Store',
+    image_url TEXT DEFAULT '',
     whatsapp_number TEXT DEFAULT '',
+    owner_id TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
-ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'Folder';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'Store';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS owner_id TEXT DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_categories_owner ON public.categories(owner_id);
 
 -- 2. PRODUCTS TABLE
 CREATE TABLE IF NOT EXISTS public.products (

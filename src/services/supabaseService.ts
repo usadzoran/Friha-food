@@ -43,11 +43,12 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
   const whatsappNum = (cat.whatsapp_number || '').trim();
 
   const payload: any = {
-    id: newId,
+    id: (cat as any).id || newId,
     name: cat.name.trim(),
     icon: cat.icon || 'Folder',
     image_url: cat.image_url || '',
     whatsapp_number: whatsappNum,
+    owner_id: cat.owner_id || '',
     created_at: cat.created_at || new Date().toISOString()
   };
 
@@ -87,6 +88,7 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
   if (updates.icon !== undefined) payload.icon = updates.icon;
   if (updates.image_url !== undefined) payload.image_url = updates.image_url;
   if (updates.whatsapp_number !== undefined) payload.whatsapp_number = updates.whatsapp_number.trim();
+  if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id;
 
   console.log('[Supabase updateCategorySupabase] Updating category:', { categoryId: id, payload });
 
