@@ -488,11 +488,10 @@ export async function saveDepartmentManagerSupabase(
   if (!supabase) {
     throw new Error('لم يتم تهيئة اتصال Supabase');
   }
-  const nowIso = new Date().toISOString();
   const id = manager.id || `mgr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const cleanPhone = (manager.phone || '').trim();
 
-  const dataToSave: DepartmentManager = {
+  const dataToSave: Record<string, any> = {
     id,
     category_id: manager.category_id,
     category_name: manager.category_name || '',
@@ -501,10 +500,13 @@ export async function saveDepartmentManagerSupabase(
     username: manager.username.trim().toLowerCase(),
     password_plain: manager.password_plain.trim(),
     is_active: manager.is_active !== undefined ? Boolean(manager.is_active) : true,
-    created_at: manager.created_at || nowIso,
-    last_login_at: manager.last_login_at || '',
-    notes: manager.notes || ''
+    notes: manager.notes || '',
+    last_login_at: manager.last_login_at ? manager.last_login_at : null
   };
+
+  if (manager.created_at) {
+    dataToSave.created_at = manager.created_at;
+  }
 
   const { data, error } = await supabase
     .from('department_managers')
@@ -522,7 +524,7 @@ export async function saveDepartmentManagerSupabase(
     saveCategoryWhatsappNumber(manager.category_id, cleanPhone).catch(() => {});
   }
 
-  return (data as DepartmentManager) || dataToSave;
+  return (data as DepartmentManager) || (dataToSave as DepartmentManager);
 }
 
 export async function deleteDepartmentManagerSupabase(id: string): Promise<void> {

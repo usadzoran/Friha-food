@@ -127,7 +127,8 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
         category_name: selectedCat ? selectedCat.name : '',
         notes: notes.trim(),
         is_active: isActive,
-        created_at: editingManager ? editingManager.created_at : new Date().toISOString()
+        created_at: editingManager ? editingManager.created_at : undefined,
+        last_login_at: editingManager ? editingManager.last_login_at : undefined
       });
 
       setIsModalOpen(false);
