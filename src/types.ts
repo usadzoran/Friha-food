@@ -84,7 +84,8 @@ export type AdminTab =
   | 'ads' 
   | 'whatsapp_settings'
   | 'department_managers'
-  | 'join_requests';
+  | 'join_requests'
+  | 'database';
 
 export type JoinRequestStatus = 'pending' | 'approved' | 'rejected';
 

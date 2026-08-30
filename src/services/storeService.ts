@@ -41,7 +41,9 @@ import {
   deleteJoinRequestSupabase,
   subscribeToJoinRequestsSupabase,
   approveAndInviteJoinRequestSupabase,
-  DEFAULT_INITIAL_ADS
+  DEFAULT_INITIAL_ADS,
+  checkDatabaseHealthSupabase,
+  type DatabaseHealthReport
 } from './supabaseService';
 import { Category, Product, Order, OrderStatus, CustomerInfo, CartItem, VisitorStats, AdSlot, DepartmentManager, JoinRequest } from '../types';
 
@@ -387,5 +389,7 @@ export {
   testWhatsappMessage,
   saveCategoryWhatsappNumber,
   syncCategoryWhatsAppFromServer,
-  DEFAULT_INITIAL_ADS
+  DEFAULT_INITIAL_ADS,
+  checkDatabaseHealthSupabase,
+  type DatabaseHealthReport
 };

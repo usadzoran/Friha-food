@@ -1276,3 +1276,158 @@ export async function saveWhatsappConfig(config: { phoneNumberId: string; wabaId
 export async function testWhatsappMessage(toPhone: string, message?: string) {
   return { success: true };
 }
+
+// ============================================================================
+// DATABASE CONNECTION & HEALTH CHECK
+// ============================================================================
+export interface DatabaseHealthReport {
+  isConnected: boolean;
+  timestamp: string;
+  latencyMs: number;
+  tables: {
+    categories: { ok: boolean; count: number; error?: string };
+    products: { ok: boolean; count: number; error?: string };
+    orders: { ok: boolean; count: number; error?: string };
+    order_items: { ok: boolean; count: number; error?: string };
+    department_managers: { ok: boolean; count: number; error?: string };
+    join_requests: { ok: boolean; count: number; error?: string };
+    ads: { ok: boolean; count: number; error?: string };
+    visitor_stats: { ok: boolean; count: number; error?: string };
+  };
+  details: string;
+}
+
+export async function checkDatabaseHealthSupabase(): Promise<DatabaseHealthReport> {
+  const startTime = Date.now();
+  const report: DatabaseHealthReport = {
+    isConnected: false,
+    timestamp: new Date().toISOString(),
+    latencyMs: 0,
+    tables: {
+      categories: { ok: false, count: 0 },
+      products: { ok: false, count: 0 },
+      orders: { ok: false, count: 0 },
+      order_items: { ok: false, count: 0 },
+      department_managers: { ok: false, count: 0 },
+      join_requests: { ok: false, count: 0 },
+      ads: { ok: false, count: 0 },
+      visitor_stats: { ok: false, count: 0 },
+    },
+    details: ''
+  };
+
+  if (!supabase) {
+    report.details = 'لم يتم تهيئة عميل Supabase. يرجى التحقق من متغيرات البيئة VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY.';
+    return report;
+  }
+
+  try {
+    // 1. Categories
+    try {
+      const { count, error } = await supabase.from('categories').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.categories = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.categories = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.categories = { ok: false, count: 0, error: e.message };
+    }
+
+    // 2. Products
+    try {
+      const { count, error } = await supabase.from('products').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.products = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.products = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.products = { ok: false, count: 0, error: e.message };
+    }
+
+    // 3. Orders
+    try {
+      const { count, error } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.orders = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.orders = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.orders = { ok: false, count: 0, error: e.message };
+    }
+
+    // 4. Order Items
+    try {
+      const { count, error } = await supabase.from('order_items').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.order_items = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.order_items = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.order_items = { ok: false, count: 0, error: e.message };
+    }
+
+    // 5. Department Managers
+    try {
+      const { count, error } = await supabase.from('department_managers').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.department_managers = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.department_managers = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.department_managers = { ok: false, count: 0, error: e.message };
+    }
+
+    // 6. Join Requests
+    try {
+      const { count, error } = await supabase.from('join_requests').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.join_requests = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.join_requests = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.join_requests = { ok: false, count: 0, error: e.message };
+    }
+
+    // 7. Ads
+    try {
+      const { count, error } = await supabase.from('ads').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.ads = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.ads = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.ads = { ok: false, count: 0, error: e.message };
+    }
+
+    // 8. Visitor Stats
+    try {
+      const { count, error } = await supabase.from('visitor_stats').select('*', { count: 'exact', head: true });
+      if (error) {
+        report.tables.visitor_stats = { ok: false, count: 0, error: error.message };
+      } else {
+        report.tables.visitor_stats = { ok: true, count: count || 0 };
+      }
+    } catch (e: any) {
+      report.tables.visitor_stats = { ok: false, count: 0, error: e.message };
+    }
+
+    report.latencyMs = Date.now() - startTime;
+    const okTablesCount = Object.values(report.tables).filter(t => t.ok).length;
+    report.isConnected = okTablesCount > 0;
+    report.details = `تم فحص قاعدة البيانات بنجاح (${okTablesCount} من 8 جداول متصلة وتعمل بكفاءة، زمن الاستجابة ${report.latencyMs}ms)`;
+
+    return report;
+  } catch (error: any) {
+    report.latencyMs = Date.now() - startTime;
+    report.isConnected = false;
+    report.details = `فشل الاتصال بقاعدة البيانات: ${error?.message || 'خطأ غير معروف'}`;
+    return report;
+  }
+}

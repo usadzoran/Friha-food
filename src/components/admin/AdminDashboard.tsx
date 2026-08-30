@@ -21,6 +21,7 @@ import { normalizeAlgerianWhatsAppNumber } from '../../utils/whatsappOrder';
 import { AdsManagerTab } from './AdsManagerTab';
 import { DepartmentManagersTab } from './DepartmentManagersTab';
 import { JoinRequestsTab } from './JoinRequestsTab';
+import { DatabaseHealthTab } from './DatabaseHealthTab';
 import { 
   LayoutDashboard, 
   Package, 
@@ -663,6 +664,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <option value="order_history">📜 سجل الطلبات ({historicOrders.length})</option>
                 <option value="visitors">👥 زوار الموقع ({visitorStats?.today_visits || 0} اليوم)</option>
                 <option value="whatsapp_settings">💬 أرقام WhatsApp للأقسام</option>
+                <option value="database">🗄️ فحص ومزامنة قاعدة البيانات</option>
               </select>
               <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
                 ▼
@@ -828,6 +830,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                 {categories.filter(c => Boolean((c.whatsapp_number || '').trim())).length}/{categories.length}
               </span>
+            </button>
+
+            {/* Database Health & Sync Tab */}
+            <button
+              onClick={() => setActiveTab('database')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
+                activeTab === 'database'
+                  ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400/40'
+                  : 'bg-indigo-950/40 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-900/50'
+              }`}
+            >
+              <Database className="w-4 h-4 text-indigo-400" />
+              <span>قاعدة البيانات</span>
             </button>
 
             <button
@@ -2371,6 +2386,19 @@ CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true
         {/* TAB: ADS & HTML MANAGEMENT */}
         {activeTab === 'ads' && (
           <AdsManagerTab ads={ads} />
+        )}
+
+        {/* TAB: DATABASE HEALTH & SCHEMA */}
+        {activeTab === 'database' && (
+          <DatabaseHealthTab
+            categories={categories}
+            products={products}
+            orders={orders}
+            managers={managers}
+            joinRequests={joinRequests}
+            ads={ads}
+            visitorStats={visitorStats}
+          />
         )}
 
       </div>
