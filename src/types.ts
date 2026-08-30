@@ -3,10 +3,14 @@ export type OrderStatus = 'pending' | 'accepted' | 'delivered' | 'cancelled';
 export interface Category {
   id: string;
   name: string;
+  description?: string;
   image_url?: string;
   icon?: string;
   whatsapp_number?: string;
   owner_id?: string;
+  address?: string;
+  location?: string;
+  working_hours?: string;
   created_at?: string;
 }
 

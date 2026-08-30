@@ -3,21 +3,32 @@
 -- Safe Migration: Non-destructive, idempotent (no DROP/TRUNCATE)
 -- ====================================================================
 
--- 1. CATEGORIES TABLE (الأقسام والمتاجر)
+-- 1. CATEGORIES / SECTIONS TABLE (الأقسام والمتاجر)
 CREATE TABLE IF NOT EXISTS public.categories (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    description TEXT DEFAULT '',
     icon TEXT DEFAULT 'Store',
     image_url TEXT DEFAULT '',
     whatsapp_number TEXT DEFAULT '',
     owner_id TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    working_hours TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'Store';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS owner_id TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS address TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS working_hours TEXT DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_categories_owner ON public.categories(owner_id);
+
+-- Alias view for systems querying 'sections'
+CREATE OR REPLACE VIEW public.sections AS SELECT * FROM public.categories;
 
 -- 2. PRODUCTS TABLE
 CREATE TABLE IF NOT EXISTS public.products (

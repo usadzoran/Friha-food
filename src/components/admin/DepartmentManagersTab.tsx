@@ -35,7 +35,8 @@ import {
   saveDepartmentManager, 
   deleteDepartmentManager, 
   toggleDepartmentManagerActive,
-  addCategory
+  addCategory,
+  updateCategory
 } from '../../services/storeService';
 import { normalizeAlgerianWhatsAppNumber } from '../../utils/whatsappOrder';
 
@@ -93,7 +94,7 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
     setPhone('');
     setUsername('');
     setPasswordPlain(`dz${Math.floor(100000 + Math.random() * 900000)}`);
-    setCategoryId(categories.length > 0 ? categories[0].id : '');
+    setCategoryId('');
     setNotes('');
     setIsActive(true);
     setDeptAssignmentMode('create_new');
@@ -112,7 +113,7 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
     setPhone(mgr.phone);
     setUsername(mgr.username);
     setPasswordPlain(mgr.password_plain);
-    setCategoryId(mgr.category_id);
+    setCategoryId(mgr.category_id || '');
     setNotes(mgr.notes || '');
     setIsActive(mgr.is_active);
     setDeptAssignmentMode('existing');
@@ -157,6 +158,7 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
     try {
       let finalCategoryId = categoryId;
       let finalCategoryName = '';
+      const managerId = editingManager ? editingManager.id : `mgr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       if (!editingManager && deptAssignmentMode === 'create_new') {
         if (!newDeptName.trim()) {
@@ -165,29 +167,34 @@ export const DepartmentManagersTab: React.FC<DepartmentManagersTabProps> = ({
           return;
         }
 
-        // Create new category in Supabase
+        // Create new category in Supabase linked directly to this manager's owner_id
         const cleanDeptName = newDeptName.trim();
         const cleanDeptPhone = newDeptPhone.trim() || phone.trim();
         const createdCatId = await addCategory({
           name: cleanDeptName,
           image_url: newDeptImage.trim() || PRESET_COVERS[0].url,
           whatsapp_number: cleanDeptPhone,
-          icon: newDeptIcon || 'Store'
+          icon: newDeptIcon || 'Store',
+          owner_id: managerId
         });
 
-        finalCategoryId = createdCatId || 'general';
+        finalCategoryId = createdCatId || '';
         finalCategoryName = cleanDeptName;
       } else if (!editingManager && deptAssignmentMode === 'delegate') {
-        finalCategoryId = 'general';
-        finalCategoryName = 'القسم التجاري (قيد التجهيز من قبل المسؤول)';
+        // New manager begins with an empty state and creates their own department on first login
+        finalCategoryId = '';
+        finalCategoryName = '';
       } else {
         const selectedCat = categories.find(c => c.id === categoryId);
         finalCategoryId = categoryId;
-        finalCategoryName = selectedCat ? selectedCat.name : 'عام';
+        finalCategoryName = selectedCat ? selectedCat.name : '';
+        if (selectedCat && (!selectedCat.owner_id || selectedCat.owner_id === '')) {
+          await updateCategory(selectedCat.id, { owner_id: managerId });
+        }
       }
 
       await saveDepartmentManager({
-        id: editingManager ? editingManager.id : undefined,
+        id: managerId,
         manager_name: managerName.trim(),
         phone: phone.trim(),
         username: username.trim().toLowerCase(),

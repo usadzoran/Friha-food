@@ -122,13 +122,17 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | OrderStatus>('all');
   
-  // Department Edit / Setup Modal State
+  // Department Edit / Setup State
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [deptForm, setDeptForm] = useState({
     name: matchedCategory?.name || (manager?.category_name !== 'القسم التجاري' ? manager?.category_name : '') || '',
+    description: matchedCategory?.description || '',
     image_url: matchedCategory?.image_url || '',
     whatsapp_number: matchedCategory?.whatsapp_number || manager?.phone || '',
+    address: matchedCategory?.address || '',
+    location: matchedCategory?.location || '',
+    working_hours: matchedCategory?.working_hours || 'يومياً من 08:00 إلى 20:00',
     icon: matchedCategory?.icon || 'Store'
   });
   const [deptImagePreview, setDeptImagePreview] = useState<string>(matchedCategory?.image_url || '');
@@ -222,8 +226,12 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
   const handleOpenDeptModal = () => {
     setDeptForm({
       name: matchedCategory?.name || (manager?.category_name !== 'القسم التجاري' ? manager?.category_name : '') || '',
+      description: matchedCategory?.description || '',
       image_url: matchedCategory?.image_url || '',
       whatsapp_number: matchedCategory?.whatsapp_number || manager?.phone || '',
+      address: matchedCategory?.address || '',
+      location: matchedCategory?.location || '',
+      working_hours: matchedCategory?.working_hours || 'يومياً من 08:00 إلى 20:00',
       icon: matchedCategory?.icon || 'Store'
     });
     setDeptImagePreview(matchedCategory?.image_url || '');
@@ -260,8 +268,12 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
         // Update existing category in Supabase
         await updateCategory(matchedCategory.id, {
           name: cleanName,
+          description: deptForm.description.trim(),
           image_url: deptForm.image_url,
           whatsapp_number: cleanPhone,
+          address: deptForm.address.trim(),
+          location: deptForm.location.trim(),
+          working_hours: deptForm.working_hours.trim(),
           icon: deptForm.icon || 'Store',
           owner_id: manager.id
         });
@@ -270,8 +282,12 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
         // Create brand new isolated category in Supabase linked to manager.id
         const newCat = await addCategory({
           name: cleanName,
+          description: deptForm.description.trim(),
           image_url: deptForm.image_url || PRESET_COVERS[0].url,
           whatsapp_number: cleanPhone,
+          address: deptForm.address.trim(),
+          location: deptForm.location.trim(),
+          working_hours: deptForm.working_hours.trim(),
           icon: deptForm.icon || 'Store',
           owner_id: manager.id
         });
@@ -1181,6 +1197,62 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
                 <p className="text-[11px] text-slate-400 mt-1">
                   الرقم المهيأ: <span className="font-mono text-emerald-700 font-bold">{normalizeAlgerianWhatsAppNumber(deptForm.whatsapp_number)}</span>
                 </p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  وصف ونشاط القسم التجاري:
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="مثال: متجر متخصص في بيع أجود أنواع التمور الطبيعية والعسل والمكسرات الطازجة..."
+                  value={deptForm.description}
+                  onChange={(e) => setDeptForm({ ...deptForm, description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white"
+                />
+              </div>
+
+              {/* Address & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    العنوان / المقر:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: شارع الاستقلال، فريحة"
+                    value={deptForm.address}
+                    onChange={(e) => setDeptForm({ ...deptForm, address: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    الموقع / الولاية والبلدية:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تيزي وزو - فريحة"
+                    value={deptForm.location}
+                    onChange={(e) => setDeptForm({ ...deptForm, location: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Working Hours */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  أوقات وساعات العمل:
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: يومياً من 08:00 إلى 20:00"
+                  value={deptForm.working_hours}
+                  onChange={(e) => setDeptForm({ ...deptForm, working_hours: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs bg-white"
+                />
               </div>
 
               {/* Cover Image Upload / Selection */}

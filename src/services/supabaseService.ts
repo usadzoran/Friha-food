@@ -45,10 +45,14 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
   const payload: any = {
     id: (cat as any).id || newId,
     name: cat.name.trim(),
+    description: cat.description || '',
     icon: cat.icon || 'Folder',
     image_url: cat.image_url || '',
     whatsapp_number: whatsappNum,
     owner_id: cat.owner_id || '',
+    address: cat.address || '',
+    location: cat.location || '',
+    working_hours: cat.working_hours || '',
     created_at: cat.created_at || new Date().toISOString()
   };
 
@@ -85,10 +89,14 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
 
   const payload: Record<string, any> = {};
   if (updates.name !== undefined) payload.name = updates.name.trim();
+  if (updates.description !== undefined) payload.description = updates.description;
   if (updates.icon !== undefined) payload.icon = updates.icon;
   if (updates.image_url !== undefined) payload.image_url = updates.image_url;
   if (updates.whatsapp_number !== undefined) payload.whatsapp_number = updates.whatsapp_number.trim();
   if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id;
+  if (updates.address !== undefined) payload.address = updates.address;
+  if (updates.location !== undefined) payload.location = updates.location;
+  if (updates.working_hours !== undefined) payload.working_hours = updates.working_hours;
 
   console.log('[Supabase updateCategorySupabase] Updating category:', { categoryId: id, payload });
 
