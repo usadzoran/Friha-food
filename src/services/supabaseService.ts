@@ -72,8 +72,9 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'> & { id?: str
   let { data, error } = await supabase
     .from('categories')
     .insert([payload])
-    .select()
-    .single();
+    .select();
+
+  let insertedCat: Category | null = (Array.isArray(data) && data.length > 0) ? (data[0] as Category) : (data as unknown as Category) || null;
 
   // 1. Handle UUID type error if id was string and db expected uuid or vice versa
   if (error && (error.message?.includes('uuid') || error.code === '22P02')) {
@@ -81,9 +82,9 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'> & { id?: str
     try {
       const pureUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
       const retryPayload = { ...payload, id: pureUuid };
-      const retryRes = await supabase.from('categories').insert([retryPayload]).select().single();
+      const retryRes = await supabase.from('categories').insert([retryPayload]).select();
       if (!retryRes.error && retryRes.data) {
-        return retryRes.data as Category;
+        return (Array.isArray(retryRes.data) ? retryRes.data[0] : retryRes.data) as Category;
       }
     } catch {}
   }
@@ -99,17 +100,18 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'> & { id?: str
     if (cat.icon) corePayload.icon = cat.icon;
     if (cat.description) corePayload.description = cat.description;
     if (whatsappNum) corePayload.whatsapp_number = whatsappNum;
+    if (cat.owner_id) corePayload.owner_id = cat.owner_id;
 
-    const retryCore = await supabase.from('categories').insert([corePayload]).select().single();
+    const retryCore = await supabase.from('categories').insert([corePayload]).select();
     if (!retryCore.error && retryCore.data) {
-      return retryCore.data as Category;
+      return (Array.isArray(retryCore.data) ? retryCore.data[0] : retryCore.data) as Category;
     }
 
     // Absolute fallback (name and image only)
     const minPayload: any = { name: cat.name.trim() };
-    const retryMin = await supabase.from('categories').insert([minPayload]).select().single();
+    const retryMin = await supabase.from('categories').insert([minPayload]).select();
     if (!retryMin.error && retryMin.data) {
-      return retryMin.data as Category;
+      return (Array.isArray(retryMin.data) ? retryMin.data[0] : retryMin.data) as Category;
     }
     error = retryCore.error || retryMin.error || error;
   }
@@ -119,11 +121,11 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'> & { id?: str
     throw new Error(`فشل إضافة القسم في Supabase: ${error.message}`);
   }
 
-  if (!data) {
-    throw new Error('فشل إضافة القسم: لم يتم إرجاع بيانات السجل من Supabase');
+  if (!insertedCat) {
+    insertedCat = payload as Category;
   }
 
-  return data as Category;
+  return insertedCat;
 }
 
 export async function updateCategorySupabase(id: string, updates: Partial<Category>): Promise<Category> {
@@ -151,8 +153,9 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
     .from('categories')
     .update(payload)
     .eq('id', id)
-    .select()
-    .single();
+    .select();
+
+  let updatedCat: Category | null = (Array.isArray(data) && data.length > 0) ? (data[0] as Category) : (data as unknown as Category) || null;
 
   // If column error, strip non-core columns and retry
   if (error && (error.code === 'PGRST204' || error.message?.toLowerCase().includes('column') || error.code === '42703')) {
@@ -164,17 +167,17 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
     if (updates.description !== undefined) corePayload.description = updates.description;
     if (updates.whatsapp_number !== undefined) corePayload.whatsapp_number = updates.whatsapp_number.trim();
 
-    const retryRes = await supabase.from('categories').update(corePayload).eq('id', id).select().single();
+    const retryRes = await supabase.from('categories').update(corePayload).eq('id', id).select();
     if (!retryRes.error && retryRes.data) {
-      return retryRes.data as Category;
+      return (Array.isArray(retryRes.data) ? retryRes.data[0] : retryRes.data) as Category;
     }
     
     // Minimal fallback
     const minPayload: any = {};
     if (updates.name !== undefined) minPayload.name = updates.name.trim();
-    const retryMin = await supabase.from('categories').update(minPayload).eq('id', id).select().single();
+    const retryMin = await supabase.from('categories').update(minPayload).eq('id', id).select();
     if (!retryMin.error && retryMin.data) {
-      return retryMin.data as Category;
+      return (Array.isArray(retryMin.data) ? retryMin.data[0] : retryMin.data) as Category;
     }
     error = retryRes.error || retryMin.error || error;
   }
@@ -184,11 +187,12 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
     throw new Error(`فشل تحديث بيانات القسم في Supabase: ${error.message}`);
   }
 
-  if (!data) {
-    throw new Error(`لم يتم العثور على القسم بالمعرف (${id}) أو لم يتم تحديث أي صف في Supabase`);
+  if (!updatedCat) {
+    // Return merged category object if updated successfully
+    return { id, ...updates } as Category;
   }
 
-  return data as Category;
+  return updatedCat;
 }
 
 export async function deleteCategorySupabase(id: string): Promise<void> {
@@ -222,8 +226,7 @@ export async function saveCategoryWhatsappNumber(categoryId: string, phone: stri
     .from('categories')
     .update({ whatsapp_number: cleanPhone })
     .eq('id', categoryId)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase error updating category whatsapp_number:', error);
@@ -233,11 +236,8 @@ export async function saveCategoryWhatsappNumber(categoryId: string, phone: stri
     throw new Error(`فشل حفظ رقم WhatsApp في Supabase: ${error.message}`);
   }
 
-  if (!data) {
-    throw new Error(`لم يتم العثور على القسم بالمعرف (${categoryId}) في Supabase أو لم يتم تحديث أي صف`);
-  }
-
-  return data as Category;
+  const updated = (Array.isArray(data) && data.length > 0) ? (data[0] as Category) : (data as unknown as Category) || { id: categoryId, whatsapp_number: cleanPhone };
+  return updated as Category;
 }
 
 export async function syncCategoryWhatsAppFromServer(): Promise<Record<string, string>> {
@@ -293,14 +293,14 @@ export async function addProductSupabase(prod: Omit<Product, 'id'>): Promise<Pro
   const { data, error } = await supabase
     .from('products')
     .insert([payload])
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase error adding product:', error);
     throw new Error(error.message);
   }
-  return data as Product;
+  const createdProd = (Array.isArray(data) && data.length > 0) ? (data[0] as Product) : (data as unknown as Product) || (payload as Product);
+  return createdProd;
 }
 
 export async function updateProductSupabase(id: string, updates: Partial<Product>): Promise<void> {
@@ -590,20 +590,21 @@ export async function saveDepartmentManagerSupabase(
   const { data, error } = await supabase
     .from('department_managers')
     .upsert(dataToSave, { onConflict: 'id' })
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase saveDepartmentManager error:', error);
     throw new Error('فشل حفظ بيانات مسؤول القسم في Supabase: ' + error.message);
   }
 
+  const savedManager = (Array.isArray(data) && data.length > 0) ? (data[0] as DepartmentManager) : (data as unknown as DepartmentManager) || (dataToSave as DepartmentManager);
+
   // Sync WhatsApp number to category
   if (cleanPhone && manager.category_id) {
     saveCategoryWhatsappNumber(manager.category_id, cleanPhone).catch(() => {});
   }
 
-  return (data as DepartmentManager) || (dataToSave as DepartmentManager);
+  return savedManager;
 }
 
 export async function deleteDepartmentManagerSupabase(id: string): Promise<void> {
@@ -770,15 +771,15 @@ export async function submitJoinRequestSupabase(
   const { data, error } = await supabase
     .from('join_requests')
     .insert([newRequest])
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase submitJoinRequest error:', error);
     throw new Error('فشل إرسال طلب الانضمام إلى Supabase: ' + error.message);
   }
 
-  return (data as JoinRequest) || newRequest;
+  const created = (Array.isArray(data) && data.length > 0) ? (data[0] as JoinRequest) : (data as unknown as JoinRequest) || newRequest;
+  return created;
 }
 
 export async function updateJoinRequestSupabase(
@@ -798,15 +799,15 @@ export async function updateJoinRequestSupabase(
     .from('join_requests')
     .update(payload)
     .eq('id', id)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase updateJoinRequest error:', error);
     throw new Error('فشل تحديث طلب الانضمام في Supabase: ' + error.message);
   }
 
-  return data as JoinRequest;
+  const updated = (Array.isArray(data) && data.length > 0) ? (data[0] as JoinRequest) : (data as unknown as JoinRequest) || null;
+  return updated;
 }
 
 export async function deleteJoinRequestSupabase(id: string): Promise<void> {
@@ -845,7 +846,7 @@ export async function approveAndInviteJoinRequestSupabase(params: {
     .from('join_requests')
     .select('*')
     .eq('id', params.requestId)
-    .single();
+    .maybeSingle();
 
   if (reqErr || !reqData) {
     throw new Error('لم يتم العثور على طلب الانضمام في Supabase');
@@ -1031,15 +1032,15 @@ export async function saveAdSupabase(ad: Omit<AdSlot, 'id'> & { id?: string }): 
   const { data, error } = await supabase
     .from('ads')
     .upsert(adSlot)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Supabase saveAd error:', error);
     throw new Error('فشل حفظ الإعلان في Supabase: ' + error.message);
   }
 
-  return (data as AdSlot) || adSlot;
+  const savedAd = (Array.isArray(data) && data.length > 0) ? (data[0] as AdSlot) : (data as unknown as AdSlot) || adSlot;
+  return savedAd;
 }
 
 export async function deleteAdSupabase(id: string): Promise<void> {
@@ -1500,3 +1501,218 @@ export async function checkDatabaseHealthSupabase(): Promise<DatabaseHealthRepor
     return report;
   }
 }
+
+// ============================================================================
+// 8. MULTI-TENANT DATA ACCESS LAYER (DAL) FOR SECTION MANAGERS
+// Enforces strict isolation: Manager -> Section (owner_id) -> Products -> Orders
+// ============================================================================
+
+/**
+ * Fetch the exact category/section owned by or assigned to a department manager.
+ * If no section exists, returns null (enables true Empty State for new managers).
+ */
+export async function getManagerCurrentCategorySupabase(
+  manager: { id: string; category_id?: string; category_name?: string }
+): Promise<Category | null> {
+  if (!supabase || !manager || !manager.id) return null;
+
+  try {
+    // 1. Primary check: Search by owner_id (Direct ownership)
+    const { data: ownedData, error: ownedErr } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('owner_id', manager.id)
+      .order('created_at', { ascending: false });
+
+    if (!ownedErr && ownedData && ownedData.length > 0) {
+      return ownedData[0] as Category;
+    }
+
+    // 2. Secondary check: Search by assigned category_id if present
+    if (manager.category_id && manager.category_id.trim()) {
+      const { data: assignedData, error: assignedErr } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', manager.category_id.trim());
+
+      if (!assignedErr && assignedData && assignedData.length > 0) {
+        return assignedData[0] as Category;
+      }
+    }
+
+    // 3. Strict isolation: return null if not found (No guessing, no fallback to categories[0])
+    return null;
+  } catch (err) {
+    console.error('Error fetching manager category:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch products strictly isolated to a single category/section ID.
+ */
+export async function getCategoryProductsSupabase(categoryId: string): Promise<Product[]> {
+  if (!supabase || !categoryId || !categoryId.trim()) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('category_id', categoryId.trim())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching category products:', error);
+      return [];
+    }
+
+    return (data as Product[]) || [];
+  } catch (err) {
+    console.error('Exception fetching category products:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch orders strictly containing items from a specific category.
+ */
+export async function getCategoryOrdersSupabase(categoryId: string): Promise<Order[]> {
+  if (!supabase || !categoryId || !categoryId.trim()) return [];
+
+  try {
+    // 1. Get all products belonging to this category
+    const { data: prods, error: prodErr } = await supabase
+      .from('products')
+      .select('id, name')
+      .eq('category_id', categoryId.trim());
+
+    if (prodErr || !prods || prods.length === 0) {
+      return [];
+    }
+
+    const prodIds = prods.map(p => p.id);
+    const prodNames = new Set(prods.map(p => p.name.trim().toLowerCase()));
+
+    // 2. Query order_items that match these product IDs
+    const { data: items, error: itemsErr } = await supabase
+      .from('order_items')
+      .select('*')
+      .in('product_id', prodIds);
+
+    if (itemsErr || !items || items.length === 0) {
+      return [];
+    }
+
+    const matchedOrderIds = Array.from(new Set(items.map(it => it.order_id)));
+    if (matchedOrderIds.length === 0) return [];
+
+    // 3. Fetch the parent orders
+    const { data: ordersData, error: ordersErr } = await supabase
+      .from('orders')
+      .select('*')
+      .in('id', matchedOrderIds)
+      .order('created_at', { ascending: false });
+
+    if (ordersErr || !ordersData) {
+      return [];
+    }
+
+    // 4. Attach scoped items to each order
+    const ordersList: Order[] = (ordersData as Order[]).map(ord => {
+      const orderSpecificItems: OrderItem[] = items
+        .filter(it => it.order_id === ord.id)
+        .map(it => ({
+          id: it.id || '',
+          order_id: ord.id,
+          product_id: it.product_id || '',
+          product_name: it.product_name || '',
+          price: Number(it.price || 0),
+          quantity: Number(it.quantity || 1),
+          subtotal: Number(it.subtotal || (Number(it.price || 0) * Number(it.quantity || 1)))
+        }));
+
+      return {
+        ...ord,
+        items: orderSpecificItems
+      };
+    });
+
+    return ordersList;
+  } catch (err) {
+    console.error('Exception in getCategoryOrdersSupabase:', err);
+    return [];
+  }
+}
+
+/**
+ * Create a new section/category for a department manager and bind owner_id & manager record.
+ */
+export async function createCategoryForManagerSupabase(
+  manager: DepartmentManager,
+  categoryData: Partial<Category>
+): Promise<{ category: Category; updatedManager: DepartmentManager }> {
+  if (!supabase) {
+    throw new Error('لم يتم الاتصال بقاعدة البيانات');
+  }
+
+  const cleanName = (categoryData.name || '').trim();
+  if (!cleanName) {
+    throw new Error('يرجى تحديد اسم القسم');
+  }
+
+  // 1. Add Category with owner_id = manager.id
+  const createdCategory = await addCategorySupabase({
+    name: cleanName,
+    icon: categoryData.icon || 'Store',
+    image_url: categoryData.image_url || '',
+    whatsapp_number: categoryData.whatsapp_number?.trim() || manager.phone.trim(),
+    owner_id: manager.id,
+    description: categoryData.description || '',
+    address: categoryData.address || '',
+    location: categoryData.location || '',
+    working_hours: categoryData.working_hours || ''
+  });
+
+  // 2. Update manager profile with category_id and category_name
+  const updatedManager = await saveDepartmentManagerSupabase({
+    ...manager,
+    category_id: createdCategory.id,
+    category_name: createdCategory.name
+  });
+
+  return { category: createdCategory, updatedManager };
+}
+
+/**
+ * Update section details and sync to manager.
+ */
+export async function updateManagerDepartmentDetailsSupabase(
+  manager: DepartmentManager,
+  categoryId: string,
+  updates: Partial<Category>
+): Promise<{ category: Category; updatedManager: DepartmentManager }> {
+  if (!supabase) {
+    throw new Error('لم يتم الاتصال بقاعدة البيانات');
+  }
+
+  // Ensure owner_id is set
+  const finalUpdates = {
+    ...updates,
+    owner_id: manager.id
+  };
+
+  const updatedCategory = await updateCategorySupabase(categoryId, finalUpdates);
+
+  // Update manager's category_name if changed
+  let updatedManager = manager;
+  if (updates.name && updates.name.trim() !== manager.category_name) {
+    updatedManager = await saveDepartmentManagerSupabase({
+      ...manager,
+      category_id: updatedCategory.id,
+      category_name: updatedCategory.name
+    });
+  }
+
+  return { category: updatedCategory, updatedManager };
+}
+

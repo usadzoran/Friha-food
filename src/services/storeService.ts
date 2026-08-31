@@ -43,7 +43,12 @@ import {
   approveAndInviteJoinRequestSupabase,
   DEFAULT_INITIAL_ADS,
   checkDatabaseHealthSupabase,
-  type DatabaseHealthReport
+  type DatabaseHealthReport,
+  getManagerCurrentCategorySupabase,
+  getCategoryProductsSupabase,
+  getCategoryOrdersSupabase,
+  createCategoryForManagerSupabase,
+  updateManagerDepartmentDetailsSupabase
 } from './supabaseService';
 import { Category, Product, Order, OrderStatus, CustomerInfo, CartItem, VisitorStats, AdSlot, DepartmentManager, JoinRequest } from '../types';
 
@@ -391,5 +396,10 @@ export {
   syncCategoryWhatsAppFromServer,
   DEFAULT_INITIAL_ADS,
   checkDatabaseHealthSupabase,
-  type DatabaseHealthReport
+  type DatabaseHealthReport,
+  getManagerCurrentCategorySupabase,
+  getCategoryProductsSupabase,
+  getCategoryOrdersSupabase,
+  createCategoryForManagerSupabase,
+  updateManagerDepartmentDetailsSupabase
 };

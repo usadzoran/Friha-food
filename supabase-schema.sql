@@ -1,6 +1,7 @@
 -- ====================================================================
 -- Supabase PostgreSQL Master Schema for Friha-food (اشري من دارك)
 -- Safe Migration: Non-destructive, idempotent (no DROP/TRUNCATE)
+-- Architecture: Admin -> Department Managers (owner_id) -> Categories -> Products -> Orders
 -- ====================================================================
 
 -- 1. CATEGORIES / SECTIONS TABLE (الأقسام والمتاجر)
@@ -17,6 +18,8 @@ CREATE TABLE IF NOT EXISTS public.categories (
     working_hours TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure all columns exist idempotently
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'Store';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
@@ -25,7 +28,11 @@ ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS description TEXT DEFAULT 
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS address TEXT DEFAULT '';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS working_hours TEXT DEFAULT '';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Indexes for fast lookups & multi-tenant isolation
 CREATE INDEX IF NOT EXISTS idx_categories_owner ON public.categories(owner_id);
+CREATE INDEX IF NOT EXISTS idx_categories_created ON public.categories(created_at);
 
 -- Alias view for systems querying 'sections'
 CREATE OR REPLACE VIEW public.sections AS SELECT * FROM public.categories;
@@ -41,10 +48,14 @@ CREATE TABLE IF NOT EXISTS public.products (
     category_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category_id TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_active ON public.products(active);
+CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
 
 -- 3. ORDERS TABLE
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -58,6 +69,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON public.orders(created_at DESC);
 
@@ -71,13 +83,14 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     quantity INTEGER DEFAULT 1,
     subtotal NUMERIC DEFAULT 0
 );
+
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product ON public.order_items(product_id);
 
 -- 5. DEPARTMENT MANAGERS TABLE (مسؤولو الأقسام)
 CREATE TABLE IF NOT EXISTS public.department_managers (
     id TEXT PRIMARY KEY,
-    category_id TEXT NOT NULL,
+    category_id TEXT DEFAULT '',
     category_name TEXT DEFAULT '',
     manager_name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -89,10 +102,14 @@ CREATE TABLE IF NOT EXISTS public.department_managers (
     last_login_at TIMESTAMPTZ,
     notes TEXT DEFAULT ''
 );
+
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS category_id TEXT DEFAULT '';
 ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS category_name TEXT DEFAULT '';
 ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT '';
 ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+ALTER TABLE public.department_managers ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_managers_category ON public.department_managers(category_id);
 CREATE INDEX IF NOT EXISTS idx_managers_username ON public.department_managers(username);
 CREATE INDEX IF NOT EXISTS idx_managers_phone ON public.department_managers(phone);
@@ -115,12 +132,14 @@ CREATE TABLE IF NOT EXISTS public.join_requests (
     reviewed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_username TEXT DEFAULT '';
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_password TEXT DEFAULT '';
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_category_id TEXT DEFAULT '';
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS assigned_category_name TEXT DEFAULT '';
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS invitation_sent_at TIMESTAMPTZ;
 ALTER TABLE public.join_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_join_requests_status ON public.join_requests(status);
 CREATE INDEX IF NOT EXISTS idx_join_requests_phone ON public.join_requests(phone);
 
@@ -135,6 +154,7 @@ CREATE TABLE IF NOT EXISTS public.ads (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_ads_placement ON public.ads(placement);
 CREATE INDEX IF NOT EXISTS idx_ads_active ON public.ads(is_active);
 
@@ -163,6 +183,7 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_order_messages (
     sent_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_whatsapp_order_id ON public.whatsapp_order_messages(order_id);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_status ON public.whatsapp_order_messages(status);
 
@@ -179,42 +200,33 @@ ALTER TABLE public.ads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visitor_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.whatsapp_order_messages ENABLE ROW LEVEL SECURITY;
 
--- Helper to safely recreate policies
+-- Idempotent RLS Policies Setup
 DO $$
 BEGIN
-    -- Categories
     DROP POLICY IF EXISTS "Allow all on categories" ON public.categories;
     CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
 
-    -- Products
     DROP POLICY IF EXISTS "Allow all on products" ON public.products;
     CREATE POLICY "Allow all on products" ON public.products FOR ALL USING (true) WITH CHECK (true);
 
-    -- Orders
     DROP POLICY IF EXISTS "Allow all on orders" ON public.orders;
     CREATE POLICY "Allow all on orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
 
-    -- Order Items
     DROP POLICY IF EXISTS "Allow all on order_items" ON public.order_items;
     CREATE POLICY "Allow all on order_items" ON public.order_items FOR ALL USING (true) WITH CHECK (true);
 
-    -- Department Managers
     DROP POLICY IF EXISTS "Allow all on department_managers" ON public.department_managers;
     CREATE POLICY "Allow all on department_managers" ON public.department_managers FOR ALL USING (true) WITH CHECK (true);
 
-    -- Join Requests
     DROP POLICY IF EXISTS "Allow all on join_requests" ON public.join_requests;
     CREATE POLICY "Allow all on join_requests" ON public.join_requests FOR ALL USING (true) WITH CHECK (true);
 
-    -- Ads
     DROP POLICY IF EXISTS "Allow all on ads" ON public.ads;
     CREATE POLICY "Allow all on ads" ON public.ads FOR ALL USING (true) WITH CHECK (true);
 
-    -- Visitor Stats
     DROP POLICY IF EXISTS "Allow all on visitor_stats" ON public.visitor_stats;
     CREATE POLICY "Allow all on visitor_stats" ON public.visitor_stats FOR ALL USING (true) WITH CHECK (true);
 
-    -- Whatsapp Order Messages
     DROP POLICY IF EXISTS "Allow all on whatsapp_order_messages" ON public.whatsapp_order_messages;
     CREATE POLICY "Allow all on whatsapp_order_messages" ON public.whatsapp_order_messages FOR ALL USING (true) WITH CHECK (true);
 END $$;
@@ -261,3 +273,4 @@ BEGIN
         FOR ALL USING (bucket_id = 'product-images') WITH CHECK (bucket_id = 'product-images');
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+

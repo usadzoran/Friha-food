@@ -292,14 +292,14 @@ export const DepartmentManagerPortal: React.FC<DepartmentManagerPortalProps> = (
           owner_id: manager.id
         });
         if (newCat) {
-          targetCategoryId = newCat;
+          targetCategoryId = typeof newCat === 'object' ? (newCat as any).id || (newCat as any) : newCat;
         }
       }
 
       // Update manager details with the newly assigned/confirmed category ID and Name
       const updatedManager = await saveDepartmentManager({
         ...manager,
-        category_id: targetCategoryId,
+        category_id: targetCategoryId || manager.category_id,
         category_name: cleanName,
         phone: cleanPhone || manager.phone
       });
