@@ -35,18 +35,29 @@ export async function getCategoriesSupabase(): Promise<Category[]> {
   return (data as Category[]) || [];
 }
 
-export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Category> {
+export async function addCategorySupabase(cat: Omit<Category, 'id'> & { id?: string }): Promise<Category> {
   if (!supabase) {
     throw new Error('لم يتم تهيئة اتصال Supabase بنجاح');
   }
-  const newId = 'cat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+  // Generate standard unique ID (supports both UUID and TEXT PostgreSQL columns)
+  let generatedId: string;
+  try {
+    generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+      ? crypto.randomUUID() 
+      : 'cat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  } catch {
+    generatedId = 'cat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  }
+
+  const newId = cat.id || generatedId;
   const whatsappNum = (cat.whatsapp_number || '').trim();
 
-  const payload: any = {
-    id: (cat as any).id || newId,
+  const payload: Record<string, any> = {
+    id: newId,
     name: cat.name.trim(),
     description: cat.description || '',
-    icon: cat.icon || 'Folder',
+    icon: cat.icon || 'Store',
     image_url: cat.image_url || '',
     whatsapp_number: whatsappNum,
     owner_id: cat.owner_id || '',
@@ -58,17 +69,53 @@ export async function addCategorySupabase(cat: Omit<Category, 'id'>): Promise<Ca
 
   console.log('[Supabase addCategorySupabase] Inserting category payload:', payload);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('categories')
     .insert([payload])
     .select()
     .single();
 
+  // 1. Handle UUID type error if id was string and db expected uuid or vice versa
+  if (error && (error.message?.includes('uuid') || error.code === '22P02')) {
+    console.warn('UUID format mismatch in categories table, trying with pure crypto UUID or omit ID...', error.message);
+    try {
+      const pureUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+      const retryPayload = { ...payload, id: pureUuid };
+      const retryRes = await supabase.from('categories').insert([retryPayload]).select().single();
+      if (!retryRes.error && retryRes.data) {
+        return retryRes.data as Category;
+      }
+    } catch {}
+  }
+
+  // 2. Handle missing column error (PGRST204 or PostgreSQL 42703 column does not exist)
+  if (error && (error.code === 'PGRST204' || error.message?.toLowerCase().includes('column') || error.code === '42703')) {
+    console.warn('Column mismatch in categories table, retrying with core columns only...', error.message);
+    const corePayload: Record<string, any> = {
+      name: cat.name.trim()
+    };
+    if (payload.id) corePayload.id = payload.id;
+    if (cat.image_url) corePayload.image_url = cat.image_url;
+    if (cat.icon) corePayload.icon = cat.icon;
+    if (cat.description) corePayload.description = cat.description;
+    if (whatsappNum) corePayload.whatsapp_number = whatsappNum;
+
+    const retryCore = await supabase.from('categories').insert([corePayload]).select().single();
+    if (!retryCore.error && retryCore.data) {
+      return retryCore.data as Category;
+    }
+
+    // Absolute fallback (name and image only)
+    const minPayload: any = { name: cat.name.trim() };
+    const retryMin = await supabase.from('categories').insert([minPayload]).select().single();
+    if (!retryMin.error && retryMin.data) {
+      return retryMin.data as Category;
+    }
+    error = retryCore.error || retryMin.error || error;
+  }
+
   if (error) {
     console.error('Supabase error adding category:', error);
-    if (error.code === 'PGRST204' || error.message?.includes('whatsapp_number')) {
-      throw new Error(`تعذر إضافة القسم برقم WhatsApp: عمود whatsapp_number غير موجود في جدول categories في قاعدة البيانات. يرجى تنفيذ ملف supabase_whatsapp_schema.sql في Supabase SQL Editor.`);
-    }
     throw new Error(`فشل إضافة القسم في Supabase: ${error.message}`);
   }
 
@@ -100,18 +147,40 @@ export async function updateCategorySupabase(id: string, updates: Partial<Catego
 
   console.log('[Supabase updateCategorySupabase] Updating category:', { categoryId: id, payload });
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('categories')
     .update(payload)
     .eq('id', id)
     .select()
     .single();
 
+  // If column error, strip non-core columns and retry
+  if (error && (error.code === 'PGRST204' || error.message?.toLowerCase().includes('column') || error.code === '42703')) {
+    console.warn('Column not found during update, falling back to core fields...', error.message);
+    const corePayload: Record<string, any> = {};
+    if (updates.name !== undefined) corePayload.name = updates.name.trim();
+    if (updates.image_url !== undefined) corePayload.image_url = updates.image_url;
+    if (updates.icon !== undefined) corePayload.icon = updates.icon;
+    if (updates.description !== undefined) corePayload.description = updates.description;
+    if (updates.whatsapp_number !== undefined) corePayload.whatsapp_number = updates.whatsapp_number.trim();
+
+    const retryRes = await supabase.from('categories').update(corePayload).eq('id', id).select().single();
+    if (!retryRes.error && retryRes.data) {
+      return retryRes.data as Category;
+    }
+    
+    // Minimal fallback
+    const minPayload: any = {};
+    if (updates.name !== undefined) minPayload.name = updates.name.trim();
+    const retryMin = await supabase.from('categories').update(minPayload).eq('id', id).select().single();
+    if (!retryMin.error && retryMin.data) {
+      return retryMin.data as Category;
+    }
+    error = retryRes.error || retryMin.error || error;
+  }
+
   if (error) {
     console.error('Supabase error updating category:', error);
-    if (error.code === 'PGRST204' || error.message?.includes('whatsapp_number')) {
-      throw new Error(`تعذر تحديث رقم WhatsApp للقسم: عمود whatsapp_number غير موجود في جدول categories في Supabase. يرجى تنفيذ ملف supabase_whatsapp_schema.sql في Supabase SQL Editor.`);
-    }
     throw new Error(`فشل تحديث بيانات القسم في Supabase: ${error.message}`);
   }
 

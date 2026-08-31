@@ -225,9 +225,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [catImageMode, setCatImageMode] = useState<'preset' | 'url' | 'upload'>('preset');
   const [catForm, setCatForm] = useState({
     name: '',
-    icon: 'Folder',
+    description: '',
+    icon: 'Store',
     image_url: '',
-    whatsapp_number: ''
+    whatsapp_number: '',
+    address: '',
+    location: '',
+    working_hours: 'يومياً من 08:00 إلى 20:00'
   });
 
   // Ads State
@@ -364,7 +368,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Category handlers
   const handleOpenAddCategory = () => {
     setEditingCategory(null);
-    setCatForm({ name: '', icon: 'Folder', image_url: PRESET_IMAGES[0].url, whatsapp_number: '' });
+    setCatForm({
+      name: '',
+      description: '',
+      icon: 'Store',
+      image_url: PRESET_IMAGES[0].url,
+      whatsapp_number: '',
+      address: '',
+      location: '',
+      working_hours: 'يومياً من 08:00 إلى 20:00'
+    });
     setCatImageMode('preset');
     setIsCategoryModalOpen(true);
   };
@@ -372,12 +385,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleOpenEditCategory = (cat: Category) => {
     setEditingCategory(cat);
     setCatForm({
-      name: cat.name,
-      icon: cat.icon || 'Folder',
+      name: cat.name || '',
+      description: cat.description || '',
+      icon: cat.icon || 'Store',
       image_url: cat.image_url || PRESET_IMAGES[0].url,
-      whatsapp_number: cat.whatsapp_number || ''
+      whatsapp_number: cat.whatsapp_number || '',
+      address: cat.address || '',
+      location: cat.location || '',
+      working_hours: cat.working_hours || 'يومياً من 08:00 إلى 20:00'
     });
-    setCatImageMode('url');
+    setCatImageMode(cat.image_url ? 'url' : 'preset');
     setIsCategoryModalOpen(true);
   };
 
@@ -400,7 +417,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!catForm.name.trim()) return;
+    if (!catForm.name.trim()) {
+      alert('يرجى إدخال اسم القسم / التصنيف');
+      return;
+    }
 
     try {
       setIsSubmittingCategory(true);
@@ -409,22 +429,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       // Clean WhatsApp phone number as raw string
       const cleanPhone = catForm.whatsapp_number.trim();
 
+      const categoryData = {
+        name: catForm.name.trim(),
+        description: catForm.description.trim(),
+        icon: catForm.icon || 'Store',
+        image_url: finalImage,
+        whatsapp_number: cleanPhone,
+        address: catForm.address.trim(),
+        location: catForm.location.trim(),
+        working_hours: catForm.working_hours.trim()
+      };
+
       if (editingCategory) {
-        await updateCategory(editingCategory.id, {
-          name: catForm.name.trim(),
-          icon: catForm.icon,
-          image_url: finalImage,
-          whatsapp_number: cleanPhone
-        });
-        setSuccessNotice('تم تعديل القسم وتحديث رقم WhatsApp الخاص به في Supabase بنجاح!');
+        await updateCategory(editingCategory.id, categoryData);
+        setSuccessNotice('تم حفظ وتحديث بيانات القسم في قاعدة البيانات بنجاح!');
       } else {
-        await addCategory({
-          name: catForm.name.trim(),
-          icon: catForm.icon,
-          image_url: finalImage,
-          whatsapp_number: cleanPhone
-        });
-        setSuccessNotice('تم إضافة القسم الجديد ورقم WhatsApp في Supabase بنجاح!');
+        await addCategory(categoryData);
+        setSuccessNotice('تم إنشاء وحفظ القسم الجديد في قاعدة البيانات بنجاح!');
       }
 
       setTimeout(() => setSuccessNotice(null), 5000);
@@ -2647,15 +2668,32 @@ CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true
             </div>
 
             <form onSubmit={handleSaveCategory} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+              {/* Category Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">اسم القسم / التصنيف</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  اسم القسم / المتجر <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={catForm.name}
                   onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
-                  placeholder="مثال: تمور وتمور جافة..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 font-bold"
+                  placeholder="مثال: تمور وفواكه جافة، ألبسة تقليدية، عسل وأعشاب..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 font-bold bg-slate-50"
+                />
+              </div>
+
+              {/* Category Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  نبذة ووصف القسم / النشاط
+                </label>
+                <textarea
+                  rows={2}
+                  value={catForm.description}
+                  onChange={(e) => setCatForm({ ...catForm, description: e.target.value })}
+                  placeholder="وصف مختصر للقسم أو أنواع المنتجات المعروضة..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 bg-slate-50 resize-none"
                 />
               </div>
 
@@ -2663,7 +2701,7 @@ CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                   <span>رقم WhatsApp الخاص بالقسم</span>
-                  <span className="text-[10px] text-emerald-600 font-semibold">اختياري - لاستقبال طلبيات هذا القسم</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">لاستقبال طلبيات هذا القسم</span>
                 </label>
                 <div className="relative">
                   <input
@@ -2690,9 +2728,34 @@ CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true
                     </span>
                   </div>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1 leading-normal">
-                  يمكنك كتابة الرقم بصيغة محلية (مثل <strong className="text-slate-600 font-mono" dir="ltr">0550123456</strong>) أو دولية (مثل <strong className="text-slate-600 font-mono" dir="ltr">213550123456</strong>).
-                </p>
+              </div>
+
+              {/* Address & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    المقر / العنوان
+                  </label>
+                  <input
+                    type="text"
+                    value={catForm.address}
+                    onChange={(e) => setCatForm({ ...catForm, address: e.target.value })}
+                    placeholder="مثال: وسط مدينة فريحة، تيزي وزو"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    أوقات العمل
+                  </label>
+                  <input
+                    type="text"
+                    value={catForm.working_hours}
+                    onChange={(e) => setCatForm({ ...catForm, working_hours: e.target.value })}
+                    placeholder="مثال: يومياً من 08:00 إلى 20:00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+                  />
+                </div>
               </div>
 
               {/* Category Image Options */}

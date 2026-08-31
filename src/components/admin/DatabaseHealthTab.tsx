@@ -423,7 +423,7 @@ FROM public.categories;`;
                 <Layers className="w-4 h-4 text-emerald-600" />
               </div>
               <div className="text-3xl font-black text-slate-900">
-                {healthReport ? Object.values(healthReport.tables).filter(t => t.ok).length : 0} <span className="text-sm font-bold text-slate-400">/ 8</span>
+                {healthReport ? Object.values(healthReport.tables).filter((t: any) => t?.ok).length : 0} <span className="text-sm font-bold text-slate-400">/ 8</span>
               </div>
               <p className="text-[11px] text-slate-500">
                 كافة جداول المتجر نشطة
